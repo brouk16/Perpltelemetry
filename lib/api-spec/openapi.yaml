@@ -174,6 +174,16 @@ components:
         indexedFraction:
           type: number
           description: Fraction (0..1) of contract history indexed
+        baselineVolumeUsd:
+          type: number
+          description: External baseline cumulative volume snapshot (e.g. from DefiLlama)
+        baselineAtMs:
+          type: integer
+          format: int64
+          description: Unix ms timestamp of the baseline snapshot
+        indexedDeltaVolumeUsd:
+          type: number
+          description: Volume our indexer has captured strictly after baselineAtMs
     MarketStat:
       type: object
       required: [perpId, symbol, dailyVolumeUsd, dailyTradeCount]

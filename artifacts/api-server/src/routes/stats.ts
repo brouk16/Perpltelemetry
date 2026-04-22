@@ -22,6 +22,19 @@ import { KNOWN_MARKETS } from "../perpl/markets";
 const router: IRouter = Router();
 const STATE_ID = "perpl";
 
+// External baseline anchor (DefiLlama publishes cumulative perp volume on
+// https://defillama.com/protocol/perpl but their API requires a paid plan, so we
+// snapshot the figure manually). Captured 2026-04-22 from the DefiLlama UI:
+// Cumulative Perp Volume = $41.94M.  Our own indexer adds delta on top of this
+// for any block timestamps strictly AFTER BASELINE_AT_MS.  Update both numbers
+// together when refreshing the snapshot.
+const BASELINE_VOLUME_USD = Number(
+  process.env["PERPL_BASELINE_VOLUME_USD"] ?? 41_940_000,
+);
+const BASELINE_AT_MS = Number(
+  process.env["PERPL_BASELINE_AT_MS"] ?? 1776888719_000,
+);
+
 router.get("/stats", async (_req, res) => {
   const stateRow = (
     await db
@@ -43,6 +56,18 @@ router.get("/stats", async (_req, res) => {
       .where(gte(blockBucketsTable.timestampMs, sinceMs))
   )[0];
 
+  // Volume our indexer has captured strictly AFTER the external baseline snapshot.
+  const sinceBaselineAgg = (
+    await db
+      .select({
+        v: sql<number>`COALESCE(SUM(${blockBucketsTable.volumeUsd}), 0)`,
+      })
+      .from(blockBucketsTable)
+      .where(gte(blockBucketsTable.timestampMs, BASELINE_AT_MS))
+  )[0];
+  const localDeltaSinceBaseline = Number(sinceBaselineAgg?.v ?? 0);
+  const totalVolumeUsd = BASELINE_VOLUME_USD + localDeltaSinceBaseline;
+
   const chainHead = await getChainHeadCached();
   const contractStart = await getContractFloorCached();
 
@@ -58,7 +83,7 @@ router.get("/stats", async (_req, res) => {
 
   const data = GetStatsResponse.parse({
     dailyVolumeUsd: Number(dailyAgg?.v ?? 0),
-    totalVolumeUsd: Number(stateRow?.totalVolumeUsd ?? 0),
+    totalVolumeUsd,
     dailyFeesUsd: Number(dailyAgg?.f ?? 0),
     totalFeesUsd: Number(stateRow?.totalFeesUsd ?? 0),
     dailyTradeCount: Number(dailyAgg?.c ?? 0),
@@ -69,6 +94,9 @@ router.get("/stats", async (_req, res) => {
     chainHeadBlock: chainHead,
     contractStartBlock: contractStart,
     indexedFraction,
+    baselineVolumeUsd: BASELINE_VOLUME_USD,
+    baselineAtMs: BASELINE_AT_MS,
+    indexedDeltaVolumeUsd: localDeltaSinceBaseline,
   });
   res.json(data);
 });

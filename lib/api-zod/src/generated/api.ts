@@ -34,6 +34,20 @@ export const GetStatsResponse = zod.object({
   indexedFraction: zod
     .number()
     .describe("Fraction (0..1) of contract history indexed"),
+  baselineVolumeUsd: zod
+    .number()
+    .optional()
+    .describe(
+      "External baseline cumulative volume snapshot (e.g. from DefiLlama)",
+    ),
+  baselineAtMs: zod
+    .number()
+    .optional()
+    .describe("Unix ms timestamp of the baseline snapshot"),
+  indexedDeltaVolumeUsd: zod
+    .number()
+    .optional()
+    .describe("Volume our indexer has captured strictly after baselineAtMs"),
 });
 
 /**

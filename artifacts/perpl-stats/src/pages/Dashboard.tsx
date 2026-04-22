@@ -175,15 +175,23 @@ export default function Dashboard() {
               className="bg-card border border-primary/20 p-6 corner-brackets relative group"
             >
               <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <p className="text-xs text-muted-foreground tracking-widest uppercase mb-2">Total Volume (Indexed)</p>
+              <p className="text-xs text-muted-foreground tracking-widest uppercase mb-2">
+                Cumulative Volume
+              </p>
               <Tooltip>
                 <TooltipTrigger className="text-left">
                   <div className="text-4xl md:text-5xl font-bold text-foreground">
                     <AnimatedNumber value={stats.totalVolumeUsd} formatFn={formatUsdCompact} />
                   </div>
                 </TooltipTrigger>
-                <TooltipContent className="font-mono bg-card border-primary/50 text-foreground">
-                  {formatUsdFull(stats.totalVolumeUsd)}
+                <TooltipContent className="font-mono bg-card border-primary/50 text-foreground max-w-xs">
+                  <div className="text-foreground font-bold mb-1">{formatUsdFull(stats.totalVolumeUsd)}</div>
+                  {stats.baselineVolumeUsd != null && (
+                    <div className="text-[10px] text-muted-foreground tracking-widest uppercase leading-relaxed">
+                      Baseline {formatUsdCompact(stats.baselineVolumeUsd)} (DefiLlama snapshot)<br />
+                      + Indexed delta {formatUsdCompact(stats.indexedDeltaVolumeUsd ?? 0)}
+                    </div>
+                  )}
                 </TooltipContent>
               </Tooltip>
               <div className="mt-4 flex justify-between text-xs text-muted-foreground uppercase">

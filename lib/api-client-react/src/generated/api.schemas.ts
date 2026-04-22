@@ -23,6 +23,12 @@ export interface PerplStats {
   contractStartBlock: number;
   /** Fraction (0..1) of contract history indexed */
   indexedFraction: number;
+  /** External baseline cumulative volume snapshot (e.g. from DefiLlama) */
+  baselineVolumeUsd?: number;
+  /** Unix ms timestamp of the baseline snapshot */
+  baselineAtMs?: number;
+  /** Volume our indexer has captured strictly after baselineAtMs */
+  indexedDeltaVolumeUsd?: number;
 }
 
 export interface MarketStat {

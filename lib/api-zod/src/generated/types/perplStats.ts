@@ -20,4 +20,10 @@ export interface PerplStats {
   contractStartBlock: bigint;
   /** Fraction (0..1) of contract history indexed */
   indexedFraction: number;
+  /** External baseline cumulative volume snapshot (e.g. from DefiLlama) */
+  baselineVolumeUsd?: number;
+  /** Unix ms timestamp of the baseline snapshot */
+  baselineAtMs?: bigint;
+  /** Volume our indexer has captured strictly after baselineAtMs */
+  indexedDeltaVolumeUsd?: number;
 }
