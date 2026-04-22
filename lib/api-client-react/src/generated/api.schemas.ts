@@ -32,6 +32,15 @@ export interface MarketStat {
   dailyTradeCount: number;
 }
 
+export interface LeaderboardEntry {
+  rank: number;
+  /** Perpl internal account ID (uint256 as decimal string) */
+  accountId: string;
+  volumeUsd: number;
+  feesUsd: number;
+  tradeCount: number;
+}
+
 export interface VolumePoint {
   timestampMs: number;
   volumeUsd: number;
@@ -40,6 +49,36 @@ export interface VolumePoint {
 
 export type GetMarketStats200 = {
   markets: MarketStat[];
+};
+
+export type GetLeaderboardParams = {
+  period?: GetLeaderboardPeriod;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limit?: number;
+};
+
+export type GetLeaderboardPeriod =
+  (typeof GetLeaderboardPeriod)[keyof typeof GetLeaderboardPeriod];
+
+export const GetLeaderboardPeriod = {
+  day: "day",
+  all: "all",
+} as const;
+
+export type GetLeaderboard200Period =
+  (typeof GetLeaderboard200Period)[keyof typeof GetLeaderboard200Period];
+
+export const GetLeaderboard200Period = {
+  day: "day",
+  all: "all",
+} as const;
+
+export type GetLeaderboard200 = {
+  period: GetLeaderboard200Period;
+  entries: LeaderboardEntry[];
 };
 
 export type GetVolumeTimeseries200 = {

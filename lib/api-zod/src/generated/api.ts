@@ -51,6 +51,37 @@ export const GetMarketStatsResponse = zod.object({
 });
 
 /**
+ * @summary Top trading accounts ranked by volume
+ */
+export const getLeaderboardQueryPeriodDefault = `day`;
+export const getLeaderboardQueryLimitDefault = 20;
+export const getLeaderboardQueryLimitMax = 100;
+
+export const GetLeaderboardQueryParams = zod.object({
+  period: zod.enum(["day", "all"]).default(getLeaderboardQueryPeriodDefault),
+  limit: zod.coerce
+    .number()
+    .min(1)
+    .max(getLeaderboardQueryLimitMax)
+    .default(getLeaderboardQueryLimitDefault),
+});
+
+export const GetLeaderboardResponse = zod.object({
+  period: zod.enum(["day", "all"]),
+  entries: zod.array(
+    zod.object({
+      rank: zod.number(),
+      accountId: zod
+        .string()
+        .describe("Perpl internal account ID (uint256 as decimal string)"),
+      volumeUsd: zod.number(),
+      feesUsd: zod.number(),
+      tradeCount: zod.number(),
+    }),
+  ),
+});
+
+/**
  * @summary Hourly volume buckets for the last 24 hours
  */
 export const GetVolumeTimeseriesResponse = zod.object({

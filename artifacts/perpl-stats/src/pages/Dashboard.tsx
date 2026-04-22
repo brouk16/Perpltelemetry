@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { 
   useGetStats, 
@@ -16,11 +16,16 @@ import {
   cn 
 } from "@/lib/utils";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+import Leaderboard from "@/components/Leaderboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
-import { Loader2, Activity, Server, Database, Globe, ChevronRight } from "lucide-react";
+import { Activity, Server, Database, Globe, ChevronRight, LayoutGrid, Trophy } from "lucide-react";
+
+type Tab = "overview" | "leaderboard";
 
 export default function Dashboard() {
+  const [tab, setTab] = useState<Tab>("overview");
+
   const { data: stats, isLoading: statsLoading, isError: statsError } = useGetStats({
     query: { refetchInterval: 10000, queryKey: getGetStatsQueryKey() }
   });
@@ -44,7 +49,7 @@ export default function Dashboard() {
     })).reverse();
   }, [timeseries]);
 
-  if (statsLoading || marketsLoading || tsLoading) {
+  if (statsLoading || (tab === "overview" && (marketsLoading || tsLoading))) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background text-primary font-mono">
         <Activity className="w-12 h-12 animate-pulse mb-4" />
@@ -92,7 +97,46 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* TABS */}
+      <div className="flex gap-2 mb-6 relative z-10">
+        {([
+          { id: "overview" as const, label: "OVERVIEW", icon: LayoutGrid },
+          { id: "leaderboard" as const, label: "LEADERBOARD", icon: Trophy },
+        ]).map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 text-xs tracking-widest uppercase font-mono border transition-colors corner-brackets relative",
+                active
+                  ? "border-primary text-primary bg-primary/10"
+                  : "border-primary/20 text-muted-foreground hover:text-foreground hover:border-primary/40",
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {t.label}
+              {active && (
+                <motion.span
+                  layoutId="tab-underline"
+                  className="absolute -bottom-px left-0 right-0 h-px bg-primary"
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "leaderboard" && (
+        <main className="relative z-10 flex-1">
+          <Leaderboard />
+        </main>
+      )}
+
       {/* MAIN GRID */}
+      {tab === "overview" && (
       <main className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10 flex-1">
         
         {/* LEFT COLUMN: HEADLINES */}
@@ -275,6 +319,7 @@ export default function Dashboard() {
           </motion.div>
         </div>
       </main>
+      )}
 
       {/* FOOTER */}
       <footer className="mt-12 border-t border-primary/20 pt-4 text-[10px] md:text-xs text-muted-foreground tracking-widest uppercase flex flex-col md:flex-row justify-between items-center text-center md:text-left gap-2 relative z-10">

@@ -36,6 +36,23 @@ export const blockBucketsTable = pgTable(
   }),
 );
 
+export const accountBucketsTable = pgTable(
+  "account_buckets",
+  {
+    fromBlock: bigint("from_block", { mode: "number" }).notNull(),
+    accountId: bigint("account_id", { mode: "number" }).notNull(),
+    timestampMs: bigint("timestamp_ms", { mode: "number" }).notNull(),
+    volumeUsd: doublePrecision("volume_usd").notNull(),
+    feesUsd: doublePrecision("fees_usd").notNull(),
+    tradeCount: integer("trade_count").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.fromBlock, t.accountId] }),
+    tsIdx: index("account_buckets_ts_idx").on(t.timestampMs),
+    acctIdx: index("account_buckets_acct_idx").on(t.accountId),
+  }),
+);
+
 export const marketBucketsTable = pgTable(
   "market_buckets",
   {

@@ -12,6 +12,7 @@ import {
   indexerStateTable,
   blockBucketsTable,
   marketBucketsTable,
+  accountBucketsTable,
 } from "@workspace/db";
 import { logger } from "../lib/logger";
 import {
@@ -90,6 +91,10 @@ type ChunkResult = {
   totalFeesUsd: number;
   totalTradeCount: number;
   perMarket: Map<number, { volumeUsd: number; tradeCount: number }>;
+  perAccount: Map<
+    number,
+    { volumeUsd: number; feesUsd: number; tradeCount: number }
+  >;
 };
 
 const marketCache = new Map<number, Market>(
@@ -137,6 +142,7 @@ async function processLogs(
     totalFeesUsd: 0,
     totalTradeCount: 0,
     perMarket: new Map(),
+    perAccount: new Map(),
   };
 
   // Use the latest log's block timestamp if we have logs, else fall back to now.
@@ -167,11 +173,13 @@ async function processLogs(
     }
     const args = decoded.args as unknown as {
       perpId: bigint;
+      accountId: bigint;
       pricePNS: bigint;
       lotLNS: bigint;
       feeCNS: bigint;
     };
     const perpId = Number(args.perpId);
+    const accountId = Number(args.accountId);
     const market = await ensureMarket(perpId);
     if (!market) continue;
     const price = Number(args.pricePNS) / 10 ** market.priceDecimals;
@@ -186,6 +194,17 @@ async function processLogs(
     m.volumeUsd += notional;
     m.tradeCount += 1;
     result.perMarket.set(perpId, m);
+    if (Number.isFinite(accountId)) {
+      const a = result.perAccount.get(accountId) ?? {
+        volumeUsd: 0,
+        feesUsd: 0,
+        tradeCount: 0,
+      };
+      a.volumeUsd += notional;
+      a.feesUsd += fee;
+      a.tradeCount += 1;
+      result.perAccount.set(accountId, a);
+    }
   }
 
   return result;
@@ -228,6 +247,22 @@ async function persistChunk(chunk: ChunkResult, direction: "forward" | "backward
           volumeUsd: m.volumeUsd,
           tradeCount: m.tradeCount,
         })
+        .onConflictDoNothing();
+    }
+
+    if (chunk.perAccount.size > 0) {
+      await tx
+        .insert(accountBucketsTable)
+        .values(
+          Array.from(chunk.perAccount, ([accountId, a]) => ({
+            fromBlock: chunk.fromBlock,
+            accountId,
+            timestampMs: chunk.timestampMs,
+            volumeUsd: a.volumeUsd,
+            feesUsd: a.feesUsd,
+            tradeCount: a.tradeCount,
+          })),
+        )
         .onConflictDoNothing();
     }
 

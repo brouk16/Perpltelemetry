@@ -5,11 +5,13 @@ import {
   indexerStateTable,
   blockBucketsTable,
   marketBucketsTable,
+  accountBucketsTable,
 } from "@workspace/db";
 import {
   GetStatsResponse,
   GetMarketStatsResponse,
   GetVolumeTimeseriesResponse,
+  GetLeaderboardResponse,
 } from "@workspace/api-zod";
 import {
   getChainHeadCached,
@@ -153,6 +155,42 @@ router.get("/stats/timeseries", async (_req, res) => {
     }));
 
   const data = GetVolumeTimeseriesResponse.parse({ points });
+  res.json(data);
+});
+
+router.get("/stats/leaderboard", async (req, res) => {
+  const period = req.query["period"] === "all" ? "all" : "day";
+  const limitRaw = Number(req.query["limit"] ?? 20);
+  const limit = Math.max(1, Math.min(100, Number.isFinite(limitRaw) ? limitRaw : 20));
+
+  const baseQuery = db
+    .select({
+      accountId: accountBucketsTable.accountId,
+      v: sql<number>`COALESCE(SUM(${accountBucketsTable.volumeUsd}), 0)`,
+      f: sql<number>`COALESCE(SUM(${accountBucketsTable.feesUsd}), 0)`,
+      c: sql<number>`COALESCE(SUM(${accountBucketsTable.tradeCount}), 0)`,
+    })
+    .from(accountBucketsTable)
+    .groupBy(accountBucketsTable.accountId)
+    .orderBy(sql`SUM(${accountBucketsTable.volumeUsd}) DESC`)
+    .limit(limit);
+
+  const rows =
+    period === "day"
+      ? await baseQuery.where(
+          gte(accountBucketsTable.timestampMs, Date.now() - 24 * 60 * 60 * 1000),
+        )
+      : await baseQuery;
+
+  const entries = rows.map((r, i) => ({
+    rank: i + 1,
+    accountId: String(r.accountId),
+    volumeUsd: Number(r.v),
+    feesUsd: Number(r.f),
+    tradeCount: Number(r.c),
+  }));
+
+  const data = GetLeaderboardResponse.parse({ period, entries });
   res.json(data);
 });
 

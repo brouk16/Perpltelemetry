@@ -6,9 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./getLeaderboard200";
+export * from "./getLeaderboard200Period";
+export * from "./getLeaderboardParams";
+export * from "./getLeaderboardPeriod";
 export * from "./getMarketStats200";
 export * from "./getVolumeTimeseries200";
 export * from "./healthStatus";
+export * from "./leaderboardEntry";
 export * from "./marketStat";
 export * from "./perplStats";
 export * from "./volumePoint";
