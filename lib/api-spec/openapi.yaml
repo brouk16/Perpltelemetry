@@ -3,13 +3,15 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Perpl Exchange stats API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: stats
+    description: Perpl exchange statistics
 paths:
   /healthz:
     get:
@@ -24,6 +26,55 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Aggregate Perpl exchange stats
+      description: Returns daily volume, total volume, fees, and indexer state
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerplStats"
+  /stats/markets:
+    get:
+      operationId: getMarketStats
+      tags: [stats]
+      summary: Per-market 24h volume breakdown
+      responses:
+        "200":
+          description: Per-market stats
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [markets]
+                properties:
+                  markets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MarketStat"
+  /stats/timeseries:
+    get:
+      operationId: getVolumeTimeseries
+      tags: [stats]
+      summary: Hourly volume buckets for the last 24 hours
+      responses:
+        "200":
+          description: Hourly buckets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points]
+                properties:
+                  points:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VolumePoint"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +84,72 @@ components:
           type: string
       required:
         - status
-
+    PerplStats:
+      type: object
+      required:
+        - dailyVolumeUsd
+        - totalVolumeUsd
+        - dailyFeesUsd
+        - totalFeesUsd
+        - dailyTradeCount
+        - totalTradeCount
+        - lastUpdatedMs
+        - indexerHeadBlock
+        - indexerTailBlock
+        - chainHeadBlock
+        - contractStartBlock
+        - indexedFraction
+      properties:
+        dailyVolumeUsd:
+          type: number
+        totalVolumeUsd:
+          type: number
+        dailyFeesUsd:
+          type: number
+        totalFeesUsd:
+          type: number
+        dailyTradeCount:
+          type: integer
+        totalTradeCount:
+          type: integer
+        lastUpdatedMs:
+          type: integer
+          format: int64
+        indexerHeadBlock:
+          type: integer
+          format: int64
+        indexerTailBlock:
+          type: integer
+          format: int64
+        chainHeadBlock:
+          type: integer
+          format: int64
+        contractStartBlock:
+          type: integer
+          format: int64
+        indexedFraction:
+          type: number
+          description: Fraction (0..1) of contract history indexed
+    MarketStat:
+      type: object
+      required: [perpId, symbol, dailyVolumeUsd, dailyTradeCount]
+      properties:
+        perpId:
+          type: integer
+        symbol:
+          type: string
+        dailyVolumeUsd:
+          type: number
+        dailyTradeCount:
+          type: integer
+    VolumePoint:
+      type: object
+      required: [timestampMs, volumeUsd, tradeCount]
+      properties:
+        timestampMs:
+          type: integer
+          format: int64
+        volumeUsd:
+          type: number
+        tradeCount:
+          type: integer

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Perpl Stats"
+version = "1.0.0"
+id = "artifacts/perpl-stats"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18471
+
+[services.development]
+run = "pnpm --filter @workspace/perpl-stats run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/perpl-stats", "run", "build" ]
+publicDir = "artifacts/perpl-stats/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18471"
+BASE_PATH = "/"
