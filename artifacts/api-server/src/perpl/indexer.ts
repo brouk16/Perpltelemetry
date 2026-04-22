@@ -30,7 +30,8 @@ const monadMainnet = defineChain({
 // dRPC free tier permits up to ~1,000-block ranges on Monad.
 const MAX_RANGE = 1_000;
 const FORWARD_INTERVAL_MS = 4_000;
-const BACKWARD_INTERVAL_MS = 800;
+const BACKWARD_INTERVAL_MS = 200;
+const BACKWARD_PARALLELISM = 4;
 const STATE_ID = "perpl";
 
 // Approximate Monad mainnet block matching contract genesis (Feb 12, 2026).
@@ -392,14 +393,28 @@ async function tickBackward() {
     if (!state) return;
     const floor = await getFloor();
     if (state.backwardTail <= floor) return;
-    const toBlock = state.backwardTail - 1;
-    const fromBlock = Math.max(toBlock - MAX_RANGE + 1, floor);
-    const chunk = await fetchChunk(fromBlock, toBlock);
-    await persistChunk(chunk, "backward");
-    logger.debug(
-      { fromBlock, toBlock, trades: chunk.totalTradeCount },
-      "backward chunk processed",
+
+    // Plan up to BACKWARD_PARALLELISM contiguous chunks below the current tail
+    // and fetch them concurrently. Persisted serially to keep state consistent.
+    const ranges: { fromBlock: number; toBlock: number }[] = [];
+    let cursor = state.backwardTail - 1;
+    for (let i = 0; i < BACKWARD_PARALLELISM && cursor > floor; i++) {
+      const toBlock = cursor;
+      const fromBlock = Math.max(toBlock - MAX_RANGE + 1, floor);
+      ranges.push({ fromBlock, toBlock });
+      cursor = fromBlock - 1;
+    }
+
+    const chunks = await Promise.all(
+      ranges.map((r) => fetchChunk(r.fromBlock, r.toBlock)),
     );
+    for (const chunk of chunks) {
+      await persistChunk(chunk, "backward");
+      logger.debug(
+        { fromBlock: chunk.fromBlock, toBlock: chunk.toBlock, trades: chunk.totalTradeCount },
+        "backward chunk processed",
+      );
+    }
   } catch (err) {
     logger.warn({ err }, "backward tick failed");
   }
