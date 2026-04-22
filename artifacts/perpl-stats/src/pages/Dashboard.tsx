@@ -82,7 +82,7 @@ export default function Dashboard() {
             LAST PING {timeAgo(stats.lastUpdatedMs)} AGO
           </span>
           <a 
-            href="https://app.perpl.xyz/" 
+            href="https://app.perpl.xyz/trade?ref=FJteZ4GVdAD" 
             target="_blank" 
             rel="noopener noreferrer"
             className="text-primary hover:text-primary-foreground transition-colors flex items-center mt-2 border border-primary/30 px-3 py-1 hover:bg-primary/20 corner-brackets"
