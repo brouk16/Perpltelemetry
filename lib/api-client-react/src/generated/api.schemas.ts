@@ -38,6 +38,8 @@ export interface LeaderboardEntry {
   accountId: string;
   volumeUsd: number;
   feesUsd: number;
+  /** Realized PnL aggregated from signed amount field on fills (USD) */
+  pnlUsd: number;
   tradeCount: number;
 }
 
@@ -53,6 +55,7 @@ export type GetMarketStats200 = {
 
 export type GetLeaderboardParams = {
   period?: GetLeaderboardPeriod;
+  metric?: GetLeaderboardMetric;
   /**
    * @minimum 1
    * @maximum 100
@@ -66,6 +69,14 @@ export type GetLeaderboardPeriod =
 export const GetLeaderboardPeriod = {
   day: "day",
   all: "all",
+} as const;
+
+export type GetLeaderboardMetric =
+  (typeof GetLeaderboardMetric)[keyof typeof GetLeaderboardMetric];
+
+export const GetLeaderboardMetric = {
+  volume: "volume",
+  pnl: "pnl",
 } as const;
 
 export type GetLeaderboard200Period =

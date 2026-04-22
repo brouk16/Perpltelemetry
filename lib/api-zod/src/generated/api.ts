@@ -54,11 +54,13 @@ export const GetMarketStatsResponse = zod.object({
  * @summary Top trading accounts ranked by volume
  */
 export const getLeaderboardQueryPeriodDefault = `day`;
+export const getLeaderboardQueryMetricDefault = `volume`;
 export const getLeaderboardQueryLimitDefault = 20;
 export const getLeaderboardQueryLimitMax = 100;
 
 export const GetLeaderboardQueryParams = zod.object({
   period: zod.enum(["day", "all"]).default(getLeaderboardQueryPeriodDefault),
+  metric: zod.enum(["volume", "pnl"]).default(getLeaderboardQueryMetricDefault),
   limit: zod.coerce
     .number()
     .min(1)
@@ -76,6 +78,11 @@ export const GetLeaderboardResponse = zod.object({
         .describe("Perpl internal account ID (uint256 as decimal string)"),
       volumeUsd: zod.number(),
       feesUsd: zod.number(),
+      pnlUsd: zod
+        .number()
+        .describe(
+          "Realized PnL aggregated from signed amount field on fills (USD)",
+        ),
       tradeCount: zod.number(),
     }),
   ),

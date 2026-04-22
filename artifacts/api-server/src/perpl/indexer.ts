@@ -6,7 +6,7 @@ import {
   decodeEventLog,
   type Log,
 } from "viem";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import {
   db,
   indexerStateTable,
@@ -93,7 +93,7 @@ type ChunkResult = {
   perMarket: Map<number, { volumeUsd: number; tradeCount: number }>;
   perAccount: Map<
     number,
-    { volumeUsd: number; feesUsd: number; tradeCount: number }
+    { volumeUsd: number; feesUsd: number; pnlUsd: number; tradeCount: number }
   >;
 };
 
@@ -177,9 +177,12 @@ async function processLogs(
       pricePNS: bigint;
       lotLNS: bigint;
       feeCNS: bigint;
+      amountCNS: bigint;
     };
     const perpId = Number(args.perpId);
     const accountId = Number(args.accountId);
+    // amountCNS is signed and represents realized PnL on this fill (CNS = AUSD, 6 decimals).
+    const pnl = Number(args.amountCNS) / 1e6;
     const market = await ensureMarket(perpId);
     if (!market) continue;
     const price = Number(args.pricePNS) / 10 ** market.priceDecimals;
@@ -198,10 +201,12 @@ async function processLogs(
       const a = result.perAccount.get(accountId) ?? {
         volumeUsd: 0,
         feesUsd: 0,
+        pnlUsd: 0,
         tradeCount: 0,
       };
       a.volumeUsd += notional;
       a.feesUsd += fee;
+      if (Number.isFinite(pnl)) a.pnlUsd += pnl;
       a.tradeCount += 1;
       result.perAccount.set(accountId, a);
     }
@@ -260,6 +265,7 @@ async function persistChunk(chunk: ChunkResult, direction: "forward" | "backward
             timestampMs: chunk.timestampMs,
             volumeUsd: a.volumeUsd,
             feesUsd: a.feesUsd,
+            pnlUsd: a.pnlUsd,
             tradeCount: a.tradeCount,
           })),
         )
@@ -455,6 +461,59 @@ async function tickBackward() {
   }
 }
 
+// Backfill: find block ranges already present in block_buckets but missing from
+// account_buckets (because per-account tracking was added after some chunks were
+// already indexed) and re-fetch logs for them so the leaderboard sees full history.
+async function tickBackfillAccounts() {
+  try {
+    const rows = await db.execute(sql`
+      SELECT bb.from_block, bb.to_block
+      FROM block_buckets bb
+      LEFT JOIN account_buckets ab ON ab.from_block = bb.from_block
+      WHERE ab.from_block IS NULL AND bb.trade_count > 0
+      ORDER BY bb.timestamp_ms DESC
+      LIMIT ${BACKWARD_PARALLELISM}
+    `);
+    const ranges = (rows.rows as { from_block: string | number; to_block: string | number }[])
+      .map((r) => ({
+        fromBlock: Number(r.from_block),
+        toBlock: Number(r.to_block),
+      }));
+    if (ranges.length === 0) return;
+    const chunks = await Promise.all(
+      ranges.map((r) => fetchChunk(r.fromBlock, r.toBlock)),
+    );
+    for (const chunk of chunks) {
+      // Only persist per-account / per-market data — block bucket already exists
+      // and totals are already counted in indexer_state, so we don't double-add.
+      await db.transaction(async (tx) => {
+        if (chunk.perAccount.size > 0) {
+          await tx
+            .insert(accountBucketsTable)
+            .values(
+              Array.from(chunk.perAccount, ([accountId, a]) => ({
+                fromBlock: chunk.fromBlock,
+                accountId,
+                timestampMs: chunk.timestampMs,
+                volumeUsd: a.volumeUsd,
+                feesUsd: a.feesUsd,
+                pnlUsd: a.pnlUsd,
+                tradeCount: a.tradeCount,
+              })),
+            )
+            .onConflictDoNothing();
+        }
+      });
+      logger.debug(
+        { fromBlock: chunk.fromBlock, accounts: chunk.perAccount.size },
+        "backfill chunk processed",
+      );
+    }
+  } catch (err) {
+    logger.warn({ err }, "backfill tick failed");
+  }
+}
+
 let started = false;
 export function startIndexer() {
   if (started) return;
@@ -484,6 +543,7 @@ export function startIndexer() {
       };
       void loop(tickForward, FORWARD_INTERVAL_MS, "forward");
       void loop(tickBackward, BACKWARD_INTERVAL_MS, "backward");
+      void loop(tickBackfillAccounts, 600, "backfill-accounts");
     } catch (err) {
       logger.error({ err }, "Indexer failed to start");
     }

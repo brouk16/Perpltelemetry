@@ -5,10 +5,12 @@
  * Perpl Exchange stats API
  * OpenAPI spec version: 0.1.0
  */
+import type { GetLeaderboardMetric } from "./getLeaderboardMetric";
 import type { GetLeaderboardPeriod } from "./getLeaderboardPeriod";
 
 export type GetLeaderboardParams = {
   period?: GetLeaderboardPeriod;
+  metric?: GetLeaderboardMetric;
   /**
    * @minimum 1
    * @maximum 100

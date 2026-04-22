@@ -160,19 +160,26 @@ router.get("/stats/timeseries", async (_req, res) => {
 
 router.get("/stats/leaderboard", async (req, res) => {
   const period = req.query["period"] === "all" ? "all" : "day";
+  const metric = req.query["metric"] === "pnl" ? "pnl" : "volume";
   const limitRaw = Number(req.query["limit"] ?? 20);
   const limit = Math.max(1, Math.min(100, Number.isFinite(limitRaw) ? limitRaw : 20));
+
+  const orderExpr =
+    metric === "pnl"
+      ? sql`SUM(${accountBucketsTable.pnlUsd}) DESC`
+      : sql`SUM(${accountBucketsTable.volumeUsd}) DESC`;
 
   const baseQuery = db
     .select({
       accountId: accountBucketsTable.accountId,
       v: sql<number>`COALESCE(SUM(${accountBucketsTable.volumeUsd}), 0)`,
       f: sql<number>`COALESCE(SUM(${accountBucketsTable.feesUsd}), 0)`,
+      p: sql<number>`COALESCE(SUM(${accountBucketsTable.pnlUsd}), 0)`,
       c: sql<number>`COALESCE(SUM(${accountBucketsTable.tradeCount}), 0)`,
     })
     .from(accountBucketsTable)
     .groupBy(accountBucketsTable.accountId)
-    .orderBy(sql`SUM(${accountBucketsTable.volumeUsd}) DESC`)
+    .orderBy(orderExpr)
     .limit(limit);
 
   const rows =
@@ -187,6 +194,7 @@ router.get("/stats/leaderboard", async (req, res) => {
     accountId: String(r.accountId),
     volumeUsd: Number(r.v),
     feesUsd: Number(r.f),
+    pnlUsd: Number(r.p),
     tradeCount: Number(r.c),
   }));
 

@@ -70,6 +70,13 @@ paths:
             type: string
             enum: [day, all]
             default: day
+        - name: metric
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [volume, pnl]
+            default: volume
         - name: limit
           in: query
           required: false
@@ -181,7 +188,7 @@ components:
           type: integer
     LeaderboardEntry:
       type: object
-      required: [rank, accountId, volumeUsd, feesUsd, tradeCount]
+      required: [rank, accountId, volumeUsd, feesUsd, pnlUsd, tradeCount]
       properties:
         rank:
           type: integer
@@ -192,6 +199,9 @@ components:
           type: number
         feesUsd:
           type: number
+        pnlUsd:
+          type: number
+          description: Realized PnL aggregated from signed amount field on fills (USD)
         tradeCount:
           type: integer
     VolumePoint:

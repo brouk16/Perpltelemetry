@@ -8,6 +8,7 @@
 
 export * from "./getLeaderboard200";
 export * from "./getLeaderboard200Period";
+export * from "./getLeaderboardMetric";
 export * from "./getLeaderboardParams";
 export * from "./getLeaderboardPeriod";
 export * from "./getMarketStats200";

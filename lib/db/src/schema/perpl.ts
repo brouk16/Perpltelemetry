@@ -44,6 +44,7 @@ export const accountBucketsTable = pgTable(
     timestampMs: bigint("timestamp_ms", { mode: "number" }).notNull(),
     volumeUsd: doublePrecision("volume_usd").notNull(),
     feesUsd: doublePrecision("fees_usd").notNull(),
+    pnlUsd: doublePrecision("pnl_usd").notNull().default(0),
     tradeCount: integer("trade_count").notNull(),
   },
   (t) => ({

@@ -12,5 +12,7 @@ export interface LeaderboardEntry {
   accountId: string;
   volumeUsd: number;
   feesUsd: number;
+  /** Realized PnL aggregated from signed amount field on fills (USD) */
+  pnlUsd: number;
   tradeCount: number;
 }
