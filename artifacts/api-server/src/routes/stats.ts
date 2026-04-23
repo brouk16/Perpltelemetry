@@ -13,6 +13,7 @@ import {
   GetStatsResponse,
   GetMarketStatsResponse,
   GetVolumeTimeseriesResponse,
+  GetVolumeBreakdownResponse,
   GetLeaderboardResponse,
   GetOiHistoryResponse,
   GetWalletsResponse,
@@ -217,6 +218,73 @@ router.get("/stats/oi-history", async (_req, res) => {
     perMarket: live.perMarket,
     perMarketHistory,
   });
+  res.json(data);
+});
+
+router.get("/stats/volume-breakdown", async (_req, res) => {
+  const now = Date.now();
+  const sinceMs = now - 24 * 60 * 60 * 1000;
+  const HOUR = 60 * 60 * 1000;
+
+  const rows = await db
+    .select({
+      perpId: marketBucketsTable.perpId,
+      timestampMs: marketBucketsTable.timestampMs,
+      volumeUsd: marketBucketsTable.volumeUsd,
+      tradeCount: marketBucketsTable.tradeCount,
+    })
+    .from(marketBucketsTable)
+    .where(gte(marketBucketsTable.timestampMs, sinceMs));
+
+  // Seed hourly slots for the past 24h
+  const allSlots: number[] = [];
+  for (let i = 23; i >= 0; i--) {
+    allSlots.push(Math.floor((now - i * HOUR) / HOUR) * HOUR);
+  }
+  const slotSet = new Set(allSlots);
+
+  // Aggregate per-market totals + hourly buckets
+  const totals = new Map<number, { volumeUsd: number; tradeCount: number }>();
+  const mktBuckets = new Map<number, Map<number, number>>();
+
+  for (const r of rows) {
+    const pid = r.perpId;
+    const slot = Math.floor(Number(r.timestampMs) / HOUR) * HOUR;
+    if (!slotSet.has(slot)) continue;
+
+    const cur = totals.get(pid) ?? { volumeUsd: 0, tradeCount: 0 };
+    cur.volumeUsd += Number(r.volumeUsd);
+    cur.tradeCount += Number(r.tradeCount);
+    totals.set(pid, cur);
+
+    if (!mktBuckets.has(pid)) mktBuckets.set(pid, new Map());
+    const mb = mktBuckets.get(pid)!;
+    mb.set(slot, (mb.get(slot) ?? 0) + Number(r.volumeUsd));
+  }
+
+  // Always include known markets
+  for (const m of Object.values(KNOWN_MARKETS)) {
+    if (!totals.has(m.perpId)) totals.set(m.perpId, { volumeUsd: 0, tradeCount: 0 });
+  }
+
+  const perMarket = Array.from(totals.entries())
+    .map(([perpId, t]) => ({
+      perpId,
+      symbol: KNOWN_MARKETS[perpId]?.symbol ?? `PERP${perpId}`,
+      volumeUsd24h: t.volumeUsd,
+      tradeCount24h: t.tradeCount,
+    }))
+    .sort((a, b) => b.volumeUsd24h - a.volumeUsd24h);
+
+  const perMarketHistory = Array.from(mktBuckets.entries())
+    .map(([perpId, mb]) => ({
+      perpId,
+      symbol: KNOWN_MARKETS[perpId]?.symbol ?? `PERP${perpId}`,
+      points: allSlots.map((slot) => ({ timestampMs: slot, volumeUsd: mb.get(slot) ?? 0 })),
+    }))
+    .filter((m) => m.points.some((p) => p.volumeUsd > 0));
+
+  const data = GetVolumeBreakdownResponse.parse({ perMarket, perMarketHistory });
   res.json(data);
 });
 
