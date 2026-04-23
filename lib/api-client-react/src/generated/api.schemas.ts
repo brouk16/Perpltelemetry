@@ -153,6 +153,24 @@ export type GetOiHistory200 = {
   perMarketHistory?: MarketOiHistory[];
 };
 
+export type MarketVolumeEntry = {
+  perpId: number;
+  symbol: string;
+  volumeUsd24h: number;
+  tradeCount24h: number;
+};
+
+export type MarketVolumeHistory = {
+  perpId: number;
+  symbol: string;
+  points: { timestampMs: number; volumeUsd: number }[];
+};
+
+export type GetVolumeBreakdown200 = {
+  perMarket: MarketVolumeEntry[];
+  perMarketHistory?: MarketVolumeHistory[];
+};
+
 export type GetVolumeTimeseries200 = {
   points: VolumePoint[];
 };
