@@ -4,6 +4,7 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": null,
   "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/server" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

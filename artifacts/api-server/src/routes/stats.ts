@@ -23,7 +23,6 @@ import {
   getContractFloorCached,
 } from "../perpl/indexer";
 import { KNOWN_MARKETS } from "../perpl/markets";
-import { getLatestOiSnapshot } from "../perpl/oi";
 
 const router: IRouter = Router();
 const STATE_ID = "perpl";
@@ -96,7 +95,23 @@ router.get("/stats", async (_req, res) => {
   )[0];
   const totalUsers = Number(usersAgg?.n ?? 0);
 
-  const oi = getLatestOiSnapshot();
+  const latestOiTsRow = (
+    await db
+      .select({ maxTs: sql<number>`MAX(${oiSnapshotsTable.timestampMs})` })
+      .from(oiSnapshotsTable)
+  )[0];
+  const latestOiTs = Number(latestOiTsRow?.maxTs ?? 0);
+  const oiRows =
+    latestOiTs > 0
+      ? await db
+          .select()
+          .from(oiSnapshotsTable)
+          .where(eq(oiSnapshotsTable.timestampMs, latestOiTs))
+      : [];
+  const oi = {
+    totalUsd: oiRows.reduce((sum, r) => sum + Number(r.oiUsd), 0),
+    atMs: latestOiTs,
+  };
 
   const data = GetStatsResponse.parse({
     dailyVolumeUsd: Number(dailyAgg?.v ?? 0),

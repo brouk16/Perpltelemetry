@@ -514,6 +514,8 @@ async function tickBackfillAccounts() {
   }
 }
 
+export { tickForward, tickBackward, tickBackfillAccounts, ensureState };
+
 let started = false;
 export function startIndexer() {
   if (started) return;
