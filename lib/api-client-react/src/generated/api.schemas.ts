@@ -29,8 +29,10 @@ export interface PerplStats {
   baselineAtMs?: number;
   /** Volume our indexer has captured strictly after baselineAtMs */
   indexedDeltaVolumeUsd?: number;
-  /** Distinct on-chain accounts seen since the contract deploy */
+  /** Total on-chain accounts created (max accountId) */
   totalUsers?: number;
+  /** Total value locked in USD (AUSD balance of exchange contract) */
+  tvlUsd?: number;
   /** Latest aggregated open interest across all markets, in USD */
   openInterestUsd?: number;
   /** Unix ms when the OI snapshot was taken (0 if no snapshot yet) */
