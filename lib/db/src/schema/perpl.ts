@@ -54,6 +54,20 @@ export const accountBucketsTable = pgTable(
   }),
 );
 
+export const oiSnapshotsTable = pgTable(
+  "oi_snapshots",
+  {
+    timestampMs: bigint("timestamp_ms", { mode: "number" }).notNull(),
+    perpId: integer("perp_id").notNull(),
+    oiUsd: doublePrecision("oi_usd").notNull(),
+    markPrice: doublePrecision("mark_price").notNull().default(0),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.timestampMs, t.perpId] }),
+    tsIdx: index("oi_snapshots_ts_idx").on(t.timestampMs),
+  }),
+);
+
 export const marketBucketsTable = pgTable(
   "market_buckets",
   {

@@ -48,6 +48,18 @@ export const GetStatsResponse = zod.object({
     .number()
     .optional()
     .describe("Volume our indexer has captured strictly after baselineAtMs"),
+  totalUsers: zod
+    .number()
+    .optional()
+    .describe("Distinct on-chain accounts seen since the contract deploy"),
+  openInterestUsd: zod
+    .number()
+    .optional()
+    .describe("Latest aggregated open interest across all markets, in USD"),
+  openInterestAtMs: zod
+    .number()
+    .optional()
+    .describe("Unix ms when the OI snapshot was taken (0 if no snapshot yet)"),
 });
 
 /**
@@ -98,6 +110,26 @@ export const GetLeaderboardResponse = zod.object({
           "Realized PnL aggregated from signed amount field on fills (USD)",
         ),
       tradeCount: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Hourly aggregated open-interest history (last 24h)
+ */
+export const GetOiHistoryResponse = zod.object({
+  points: zod.array(
+    zod.object({
+      timestampMs: zod.number(),
+      oiUsd: zod.number(),
+    }),
+  ),
+  perMarket: zod.array(
+    zod.object({
+      perpId: zod.number(),
+      symbol: zod.string(),
+      oiUsd: zod.number(),
+      markPrice: zod.number(),
     }),
   ),
 });

@@ -29,6 +29,24 @@ export interface PerplStats {
   baselineAtMs?: number;
   /** Volume our indexer has captured strictly after baselineAtMs */
   indexedDeltaVolumeUsd?: number;
+  /** Distinct on-chain accounts seen since the contract deploy */
+  totalUsers?: number;
+  /** Latest aggregated open interest across all markets, in USD */
+  openInterestUsd?: number;
+  /** Unix ms when the OI snapshot was taken (0 if no snapshot yet) */
+  openInterestAtMs?: number;
+}
+
+export interface OiPoint {
+  timestampMs: number;
+  oiUsd: number;
+}
+
+export interface MarketOi {
+  perpId: number;
+  symbol: string;
+  oiUsd: number;
+  markPrice: number;
 }
 
 export interface MarketStat {
@@ -96,6 +114,11 @@ export const GetLeaderboard200Period = {
 export type GetLeaderboard200 = {
   period: GetLeaderboard200Period;
   entries: LeaderboardEntry[];
+};
+
+export type GetOiHistory200 = {
+  points: OiPoint[];
+  perMarket: MarketOi[];
 };
 
 export type GetVolumeTimeseries200 = {

@@ -6,18 +6,21 @@ import {
   blockBucketsTable,
   marketBucketsTable,
   accountBucketsTable,
+  oiSnapshotsTable,
 } from "@workspace/db";
 import {
   GetStatsResponse,
   GetMarketStatsResponse,
   GetVolumeTimeseriesResponse,
   GetLeaderboardResponse,
+  GetOiHistoryResponse,
 } from "@workspace/api-zod";
 import {
   getChainHeadCached,
   getContractFloorCached,
 } from "../perpl/indexer";
 import { KNOWN_MARKETS } from "../perpl/markets";
+import { getLatestOiSnapshot } from "../perpl/oi";
 
 const router: IRouter = Router();
 const STATE_ID = "perpl";
@@ -81,6 +84,17 @@ router.get("/stats", async (_req, res) => {
     Math.min(1, indexedRange / totalRange),
   );
 
+  const usersAgg = (
+    await db
+      .select({
+        n: sql<number>`COUNT(DISTINCT ${accountBucketsTable.accountId})`,
+      })
+      .from(accountBucketsTable)
+  )[0];
+  const totalUsers = Number(usersAgg?.n ?? 0);
+
+  const oi = getLatestOiSnapshot();
+
   const data = GetStatsResponse.parse({
     dailyVolumeUsd: Number(dailyAgg?.v ?? 0),
     totalVolumeUsd,
@@ -97,6 +111,58 @@ router.get("/stats", async (_req, res) => {
     baselineVolumeUsd: BASELINE_VOLUME_USD,
     baselineAtMs: BASELINE_AT_MS,
     indexedDeltaVolumeUsd: localDeltaSinceBaseline,
+    totalUsers,
+    openInterestUsd: oi.totalUsd,
+    openInterestAtMs: oi.atMs,
+  });
+  res.json(data);
+});
+
+router.get("/stats/oi-history", async (_req, res) => {
+  const now = Date.now();
+  const sinceMs = now - 24 * 60 * 60 * 1000;
+  const rows = await db
+    .select({
+      timestampMs: oiSnapshotsTable.timestampMs,
+      oiUsd: oiSnapshotsTable.oiUsd,
+    })
+    .from(oiSnapshotsTable)
+    .where(gte(oiSnapshotsTable.timestampMs, sinceMs));
+
+  const HOUR = 60 * 60 * 1000;
+  const buckets = new Map<number, number>();
+  for (let i = 23; i >= 0; i--) {
+    const slot = Math.floor((now - i * HOUR) / HOUR) * HOUR;
+    buckets.set(slot, 0);
+  }
+  // Sum per timestamp first (each ts has one row per market) then take MAX per
+  // hour bucket so the chart shows a representative OI level per hour.
+  const perTs = new Map<number, number>();
+  for (const r of rows) {
+    const ts = Number(r.timestampMs);
+    perTs.set(ts, (perTs.get(ts) ?? 0) + Number(r.oiUsd));
+  }
+  for (const [ts, sumUsd] of perTs) {
+    const slot = Math.floor(ts / HOUR) * HOUR;
+    if (!buckets.has(slot)) continue;
+    buckets.set(slot, Math.max(buckets.get(slot)!, sumUsd));
+  }
+
+  const points = Array.from(buckets.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([timestampMs, oiUsd]) => ({ timestampMs, oiUsd }));
+
+  // If we have no historical snapshots yet (first boot), seed the most recent
+  // bucket with the live in-memory snapshot so the chart isn't empty.
+  const live = getLatestOiSnapshot();
+  if (live.totalUsd > 0 && points[points.length - 1]) {
+    const last = points[points.length - 1]!;
+    if (last.oiUsd === 0) last.oiUsd = live.totalUsd;
+  }
+
+  const data = GetOiHistoryResponse.parse({
+    points,
+    perMarket: live.perMarket,
   });
   res.json(data);
 });

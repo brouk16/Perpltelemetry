@@ -26,4 +26,10 @@ export interface PerplStats {
   baselineAtMs?: bigint;
   /** Volume our indexer has captured strictly after baselineAtMs */
   indexedDeltaVolumeUsd?: number;
+  /** Distinct on-chain accounts seen since the contract deploy */
+  totalUsers?: number;
+  /** Latest aggregated open interest across all markets, in USD */
+  openInterestUsd?: number;
+  /** Unix ms when the OI snapshot was taken (0 if no snapshot yet) */
+  openInterestAtMs?: bigint;
 }

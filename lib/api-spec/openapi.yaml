@@ -101,6 +101,28 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/LeaderboardEntry"
+  /stats/oi-history:
+    get:
+      operationId: getOiHistory
+      tags: [stats]
+      summary: Hourly aggregated open-interest history (last 24h)
+      responses:
+        "200":
+          description: Open-interest hourly buckets
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [points, perMarket]
+                properties:
+                  points:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OiPoint"
+                  perMarket:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MarketOi"
   /stats/timeseries:
     get:
       operationId: getVolumeTimeseries
@@ -184,6 +206,37 @@ components:
         indexedDeltaVolumeUsd:
           type: number
           description: Volume our indexer has captured strictly after baselineAtMs
+        totalUsers:
+          type: integer
+          description: Distinct on-chain accounts seen since the contract deploy
+        openInterestUsd:
+          type: number
+          description: Latest aggregated open interest across all markets, in USD
+        openInterestAtMs:
+          type: integer
+          format: int64
+          description: Unix ms when the OI snapshot was taken (0 if no snapshot yet)
+    OiPoint:
+      type: object
+      required: [timestampMs, oiUsd]
+      properties:
+        timestampMs:
+          type: integer
+          format: int64
+        oiUsd:
+          type: number
+    MarketOi:
+      type: object
+      required: [perpId, symbol, oiUsd, markPrice]
+      properties:
+        perpId:
+          type: integer
+        symbol:
+          type: string
+        oiUsd:
+          type: number
+        markPrice:
+          type: number
     MarketStat:
       type: object
       required: [perpId, symbol, dailyVolumeUsd, dailyTradeCount]

@@ -6,7 +6,9 @@ import {
   useGetMarketStats, 
   getGetMarketStatsQueryKey,
   useGetVolumeTimeseries,
-  getGetVolumeTimeseriesQueryKey
+  getGetVolumeTimeseriesQueryKey,
+  useGetOiHistory,
+  getGetOiHistoryQueryKey,
 } from "@workspace/api-client-react";
 import { 
   formatUsdCompact, 
@@ -18,8 +20,8 @@ import {
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import Leaderboard from "@/components/Leaderboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip } from "recharts";
-import { Activity, Server, Database, Globe, ChevronRight, LayoutGrid, Trophy } from "lucide-react";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LineChart, Line } from "recharts";
+import { Activity, Server, Database, Globe, ChevronRight, LayoutGrid, Trophy, Users, TrendingUp } from "lucide-react";
 
 type Tab = "overview" | "leaderboard";
 
@@ -38,6 +40,10 @@ export default function Dashboard() {
     query: { refetchInterval: 30000, queryKey: getGetVolumeTimeseriesQueryKey() }
   });
 
+  const { data: oiData } = useGetOiHistory({
+    query: { refetchInterval: 30000, queryKey: getGetOiHistoryQueryKey() }
+  });
+
   const markets = marketStatsData?.markets || [];
   const timeseries = tsData?.points || [];
 
@@ -48,6 +54,14 @@ export default function Dashboard() {
       trades: pt.tradeCount
     })).reverse();
   }, [timeseries]);
+
+  const oiChart = useMemo(() => {
+    return (oiData?.points ?? []).map((pt) => ({
+      time: new Date(pt.timestampMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      oi: pt.oiUsd,
+    }));
+  }, [oiData]);
+  const oiPerMarket = oiData?.perMarket ?? [];
 
   if (statsLoading || (tab === "overview" && (marketsLoading || tsLoading))) {
     return (
@@ -203,6 +217,69 @@ export default function Dashboard() {
                 <span>Total Fees: <AnimatedNumber value={stats.totalFeesUsd} formatFn={formatUsdCompact} className="text-foreground" /></span>
               </div>
             </motion.div>
+
+            {/* TOTAL USERS */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="bg-card border border-primary/20 p-6 corner-brackets relative group"
+            >
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <p className="text-xs text-muted-foreground tracking-widest uppercase mb-2 flex items-center">
+                <Users className="w-3.5 h-3.5 mr-2 text-primary" /> Total Users
+              </p>
+              <Tooltip>
+                <TooltipTrigger className="text-left">
+                  <div className="text-4xl md:text-5xl font-bold text-foreground">
+                    <AnimatedNumber value={stats.totalUsers ?? 0} formatFn={formatNumberCompact} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="font-mono bg-card border-primary/50 text-foreground">
+                  {(stats.totalUsers ?? 0).toLocaleString()} distinct on-chain accounts
+                </TooltipContent>
+              </Tooltip>
+              <div className="mt-2 text-[9px] tracking-widest uppercase text-muted-foreground">
+                Distinct accountIds since contract genesis
+              </div>
+              <div className="mt-4 text-xs text-muted-foreground uppercase">
+                Avg vol/user: <span className="text-foreground">{formatUsdCompact((stats.totalUsers ?? 0) > 0 ? stats.totalVolumeUsd / (stats.totalUsers ?? 1) : 0)}</span>
+              </div>
+            </motion.div>
+
+            {/* OPEN INTEREST */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-card border border-primary/20 p-6 corner-brackets relative group"
+            >
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <p className="text-xs text-muted-foreground tracking-widest uppercase mb-2 flex items-center">
+                <TrendingUp className="w-3.5 h-3.5 mr-2 text-primary" /> Open Interest
+              </p>
+              <Tooltip>
+                <TooltipTrigger className="text-left">
+                  <div className="text-4xl md:text-5xl font-bold text-primary">
+                    <AnimatedNumber value={stats.openInterestUsd ?? 0} formatFn={formatUsdCompact} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="font-mono bg-card border-primary/50 text-foreground">
+                  {formatUsdFull(stats.openInterestUsd ?? 0)}
+                </TooltipContent>
+              </Tooltip>
+              <div className="mt-2 flex items-center gap-1.5 text-[9px] tracking-widest uppercase text-secondary/80">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                <span>{(stats.openInterestAtMs ?? 0) > 0 ? `Live · synced ${timeAgo(stats.openInterestAtMs ?? 0)} ago` : "Awaiting first market-state frame"}</span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground uppercase">
+                {oiPerMarket.slice(0, 4).map((m) => (
+                  <span key={m.perpId}>
+                    {m.symbol}: <span className="text-foreground">{formatUsdCompact(m.oiUsd)}</span>
+                  </span>
+                ))}
+              </div>
+            </motion.div>
           </div>
 
           {/* CHART */}
@@ -244,6 +321,59 @@ export default function Dashboard() {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+          </motion.div>
+
+          {/* OI CHART */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="bg-card border border-primary/20 p-6 corner-brackets min-h-[260px] flex flex-col"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <p className="text-xs text-muted-foreground tracking-widest uppercase flex items-center">
+                <TrendingUp className="w-4 h-4 mr-2 text-secondary" />
+                Open Interest (24H)
+              </p>
+              <span className="text-xs text-secondary font-bold">
+                {formatUsdCompact(stats.openInterestUsd ?? 0)}
+              </span>
+            </div>
+            <div className="flex-1 w-full relative min-h-[180px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={oiChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v) => formatUsdCompact(v)}
+                    domain={["auto", "auto"]}
+                  />
+                  <RechartsTooltip
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--secondary)/0.5)', fontFamily: 'inherit' }}
+                    itemStyle={{ color: 'hsl(var(--foreground))' }}
+                    formatter={(value: number) => [formatUsdCompact(value), 'OI']}
+                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Line type="monotone" dataKey="oi" stroke="hsl(var(--secondary))" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            {oiPerMarket.length > 0 && (
+              <div className="mt-4 pt-3 border-t border-primary/10 flex flex-wrap gap-x-4 gap-y-1 text-[10px] uppercase tracking-widest">
+                {oiPerMarket.map((m) => (
+                  <span key={m.perpId} className="text-muted-foreground">
+                    {m.symbol}: <span className="text-foreground">{formatUsdCompact(m.oiUsd)}</span>
+                    {m.markPrice > 0 && (
+                      <span className="text-muted-foreground/60 ml-1">@{formatUsdCompact(m.markPrice)}</span>
+                    )}
+                  </span>
+                ))}
+              </div>
+            )}
           </motion.div>
         </div>
 

@@ -17,6 +17,7 @@ import type {
   GetLeaderboard200,
   GetLeaderboardParams,
   GetMarketStats200,
+  GetOiHistory200,
   GetVolumeTimeseries200,
   HealthStatus,
   PerplStats,
@@ -334,6 +335,81 @@ export function useGetLeaderboard<
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetLeaderboardQueryOptions(params, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Hourly aggregated open-interest history (last 24h)
+ */
+export const getGetOiHistoryUrl = () => {
+  return `/api/stats/oi-history`;
+};
+
+export const getOiHistory = async (
+  options?: RequestInit,
+): Promise<GetOiHistory200> => {
+  return customFetch<GetOiHistory200>(getGetOiHistoryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetOiHistoryQueryKey = () => {
+  return [`/api/stats/oi-history`] as const;
+};
+
+export const getGetOiHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getOiHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOiHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetOiHistoryQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getOiHistory>>> = ({
+    signal,
+  }) => getOiHistory({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getOiHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetOiHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getOiHistory>>
+>;
+export type GetOiHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Hourly aggregated open-interest history (last 24h)
+ */
+
+export function useGetOiHistory<
+  TData = Awaited<ReturnType<typeof getOiHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getOiHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetOiHistoryQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
