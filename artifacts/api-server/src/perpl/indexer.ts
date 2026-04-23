@@ -514,6 +514,135 @@ async function tickBackfillAccounts() {
   }
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Wallet backfill: scan deposit events to auto-populate accountId → wallet map
+// ──────────────────────────────────────────────────────────────────────────────
+
+const DEPOSIT_TOPIC =
+  "0x6be50b396ca4962b3810cd9e65b8160cd24180a1e7adbc2c795e8dd090891284" as const;
+const WALLET_STATE_ID = "perpl_wallets";
+
+async function batchGetTransactionFroms(
+  hashes: string[],
+): Promise<Map<string, string>> {
+  if (hashes.length === 0) return new Map();
+  const batch = hashes.map((h, i) => ({
+    jsonrpc: "2.0",
+    method: "eth_getTransactionByHash",
+    params: [h],
+    id: i + 1,
+  }));
+  try {
+    const res = await fetch("https://monad.drpc.org", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(batch),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const results = (await res.json()) as Array<{
+      id: number;
+      result?: { hash: string; from: string } | null;
+    }>;
+    const map = new Map<string, string>();
+    for (const r of results) {
+      if (r.result?.from) map.set(r.result.hash, r.result.from.toLowerCase());
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+export async function tickBackfillWallets() {
+  try {
+    const mainState = (
+      await db
+        .select()
+        .from(indexerStateTable)
+        .where(eq(indexerStateTable.id, STATE_ID))
+        .limit(1)
+    )[0];
+    if (!mainState) return;
+
+    const floor = await getFloor();
+    const head = mainState.forwardHead;
+
+    // Get or initialise wallet scan cursor
+    const walletRows = await db
+      .select()
+      .from(indexerStateTable)
+      .where(eq(indexerStateTable.id, WALLET_STATE_ID))
+      .limit(1);
+
+    if (walletRows.length === 0) {
+      await db
+        .insert(indexerStateTable)
+        .values({
+          id: WALLET_STATE_ID,
+          forwardHead: floor,
+          backwardTail: floor,
+          totalVolumeUsd: 0,
+          totalFeesUsd: 0,
+          totalTradeCount: 0,
+          lastUpdatedMs: Date.now(),
+        })
+        .onConflictDoNothing();
+      return;
+    }
+
+    const cursor = walletRows[0]!.forwardHead;
+    if (cursor >= head) return;
+
+    const fromBlock = cursor + 1;
+    const toBlock = Math.min(fromBlock + MAX_RANGE - 1, head);
+
+    const logs = await client.getLogs({
+      address: PERPL_EXCHANGE_ADDRESS,
+      topics: [DEPOSIT_TOPIC],
+      fromBlock: BigInt(fromBlock),
+      toBlock: BigInt(toBlock),
+    });
+
+    if (logs.length > 0) {
+      // Batch-fetch all unique transactions
+      const uniqueHashes = [...new Set(logs.map((l) => l.transactionHash as string))];
+      const fromMap = await batchGetTransactionFroms(uniqueHashes);
+
+      const entries: { accountId: number; walletAddress: string; claimedAtMs: number }[] = [];
+      for (const log of logs) {
+        const accountId = Number(BigInt("0x" + log.data.slice(2, 66)));
+        const walletAddress = fromMap.get(log.transactionHash as string);
+        if (accountId > 0 && walletAddress) {
+          entries.push({ accountId, walletAddress, claimedAtMs: 0 });
+        }
+      }
+
+      if (entries.length > 0) {
+        // Insert in chunks to avoid huge queries; don't overwrite user-claimed entries
+        for (let i = 0; i < entries.length; i += 50) {
+          const chunk = entries.slice(i, i + 50);
+          await db
+            .insert(accountWalletsTable)
+            .values(chunk)
+            .onConflictDoNothing();
+        }
+        logger.debug(
+          { fromBlock, toBlock, entries: entries.length },
+          "wallet backfill chunk processed",
+        );
+      }
+    }
+
+    // Advance cursor
+    await db
+      .update(indexerStateTable)
+      .set({ forwardHead: toBlock, lastUpdatedMs: Date.now() })
+      .where(eq(indexerStateTable.id, WALLET_STATE_ID));
+  } catch (err) {
+    logger.warn({ err }, "wallet backfill tick failed");
+  }
+}
+
 export { tickForward, tickBackward, tickBackfillAccounts, ensureState };
 
 let started = false;
@@ -546,6 +675,7 @@ export function startIndexer() {
       void loop(tickForward, FORWARD_INTERVAL_MS, "forward");
       void loop(tickBackward, BACKWARD_INTERVAL_MS, "backward");
       void loop(tickBackfillAccounts, 600, "backfill-accounts");
+      void loop(tickBackfillWallets, 800, "backfill-wallets");
     } catch (err) {
       logger.error({ err }, "Indexer failed to start");
     }
