@@ -29,27 +29,20 @@ import { KNOWN_MARKETS } from "../perpl/markets";
 const router: IRouter = Router();
 const STATE_ID = "perpl";
 
-const AUSD_TOKEN = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
-const PERPL_EXCHANGE = "0x34b6552d57a35a1d042ccae1951bd1c370112a6f";
-const MONAD_RPC = "https://monad.drpc.org";
-
 let tvlCache: { usd: number; ts: number } = { usd: 0, ts: 0 };
-const TVL_CACHE_TTL_MS = 60_000;
+const TVL_CACHE_TTL_MS = 5 * 60_000; // 5 minutes — DeFiLlama updates daily
 
 async function fetchTvlUsd(): Promise<number> {
   const now = Date.now();
   if (now - tvlCache.ts < TVL_CACHE_TTL_MS) return tvlCache.usd;
   try {
-    const data = "0x70a08231" + PERPL_EXCHANGE.slice(2).padStart(64, "0");
-    const res = await fetch(MONAD_RPC, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", params: [{ to: AUSD_TOKEN, data }, "latest"], id: 1 }),
-      signal: AbortSignal.timeout(5000),
+    const res = await fetch("https://api.llama.fi/tvl/perpl", {
+      signal: AbortSignal.timeout(6000),
     });
-    const j = await res.json() as { result?: string };
-    if (j.result && j.result !== "0x") {
-      tvlCache = { usd: Number(BigInt(j.result)) / 1e6, ts: now };
+    const text = await res.text();
+    const val = Number(text.trim());
+    if (Number.isFinite(val) && val > 0) {
+      tvlCache = { usd: val, ts: now };
     }
   } catch { /* keep cached */ }
   return tvlCache.usd;
