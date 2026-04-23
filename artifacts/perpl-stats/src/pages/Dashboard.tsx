@@ -194,6 +194,10 @@ export default function Dashboard() {
                   )}
                 </TooltipContent>
               </Tooltip>
+              <div className="mt-2 flex items-center gap-1.5 text-[9px] tracking-widest uppercase text-secondary/80">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                <span>Anchored to DefiLlama snapshot · live delta on-chain</span>
+              </div>
               <div className="mt-4 flex justify-between text-xs text-muted-foreground uppercase">
                 <span>Total Trades: <AnimatedNumber value={stats.totalTradeCount} formatFn={formatNumberCompact} className="text-foreground" /></span>
                 <span>Total Fees: <AnimatedNumber value={stats.totalFeesUsd} formatFn={formatUsdCompact} className="text-foreground" /></span>
