@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @workspace/perpl-stats run build:vercel",
-  "outputDirectory": "artifacts/perpl-stats/dist/public",
+  "outputDirectory": "artifacts/perpl-stats/dist",
   "installCommand": "pnpm install --frozen-lockfile",
   "framework": null,
   "rewrites": [
