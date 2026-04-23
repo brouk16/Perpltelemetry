@@ -5,8 +5,8 @@ Sci-fi mission-control dashboard tracking on-chain stats for **Perpl**, a decent
 ## Architecture
 
 - **artifacts/perpl-stats** — React + Vite frontend (`/`). Dark Monad-purple/cyan HUD with framer-motion ticking digits and a Recharts 24h volume chart. Polls the API every 10–30s.
-- **artifacts/api-server** — Express API exposing `/stats`, `/stats/markets`, `/stats/timeseries`, plus a background on-chain indexer.
-- **lib/db** — Drizzle/Postgres schema for indexer state and per-bucket aggregates (`indexer_state`, `block_buckets`, `market_buckets`).
+- **artifacts/api-server** — Express API exposing `/stats`, `/stats/markets`, `/stats/timeseries`, `/stats/leaderboard`, `/stats/oi-history`, `/stats/wallets` plus a background on-chain indexer.
+- **lib/db** — Drizzle/Postgres schema for indexer state and per-bucket aggregates (`indexer_state`, `block_buckets`, `market_buckets`, `account_buckets`, `oi_snapshots`, `account_wallets`).
 - **lib/api-spec / api-client-react / api-zod** — OpenAPI source of truth + generated typed hooks and zod validators.
 
 ## Indexer

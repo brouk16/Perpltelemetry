@@ -56,10 +56,21 @@ export interface MarketStat {
   dailyTradeCount: number;
 }
 
+export interface AccountWallet {
+  accountId: string;
+  walletAddress: string;
+  label?: string | null;
+  claimedAtMs: number;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   /** Perpl internal account ID (uint256 as decimal string) */
   accountId: string;
+  /** User-claimed wallet address (self-declared) */
+  walletAddress?: string | null;
+  /** Optional display label set by user */
+  label?: string | null;
   volumeUsd: number;
   feesUsd: number;
   /** Realized PnL aggregated from signed amount field on fills (USD) */
@@ -114,6 +125,20 @@ export const GetLeaderboard200Period = {
 export type GetLeaderboard200 = {
   period: GetLeaderboard200Period;
   entries: LeaderboardEntry[];
+};
+
+export type GetWallets200 = {
+  wallets: AccountWallet[];
+};
+
+export type ClaimWalletBody = {
+  accountId: string;
+  walletAddress: string;
+  label?: string;
+};
+
+export type ClaimWallet400 = {
+  error: string;
 };
 
 export type GetOiHistory200 = {

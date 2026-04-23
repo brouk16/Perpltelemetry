@@ -5,26 +5,33 @@
  * Perpl Exchange stats API
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
 import type {
+  AccountWallet,
+  ClaimWallet400,
+  ClaimWalletBody,
   GetLeaderboard200,
   GetLeaderboardParams,
   GetMarketStats200,
   GetOiHistory200,
   GetVolumeTimeseries200,
+  GetWallets200,
   HealthStatus,
   PerplStats,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -342,6 +349,167 @@ export function useGetLeaderboard<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get all claimed wallet → accountId mappings
+ */
+export const getGetWalletsUrl = () => {
+  return `/api/stats/wallets`;
+};
+
+export const getWallets = async (
+  options?: RequestInit,
+): Promise<GetWallets200> => {
+  return customFetch<GetWallets200>(getGetWalletsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetWalletsQueryKey = () => {
+  return [`/api/stats/wallets`] as const;
+};
+
+export const getGetWalletsQueryOptions = <
+  TData = Awaited<ReturnType<typeof getWallets>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWallets>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetWalletsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getWallets>>> = ({
+    signal,
+  }) => getWallets({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getWallets>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetWalletsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getWallets>>
+>;
+export type GetWalletsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get all claimed wallet → accountId mappings
+ */
+
+export function useGetWallets<
+  TData = Awaited<ReturnType<typeof getWallets>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getWallets>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetWalletsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Associate a wallet address with an accountId (self-declaration)
+ */
+export const getClaimWalletUrl = () => {
+  return `/api/stats/wallets`;
+};
+
+export const claimWallet = async (
+  claimWalletBody: ClaimWalletBody,
+  options?: RequestInit,
+): Promise<AccountWallet> => {
+  return customFetch<AccountWallet>(getClaimWalletUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(claimWalletBody),
+  });
+};
+
+export const getClaimWalletMutationOptions = <
+  TError = ErrorType<ClaimWallet400>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimWallet>>,
+    TError,
+    { data: BodyType<ClaimWalletBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof claimWallet>>,
+  TError,
+  { data: BodyType<ClaimWalletBody> },
+  TContext
+> => {
+  const mutationKey = ["claimWallet"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof claimWallet>>,
+    { data: BodyType<ClaimWalletBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return claimWallet(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClaimWalletMutationResult = NonNullable<
+  Awaited<ReturnType<typeof claimWallet>>
+>;
+export type ClaimWalletMutationBody = BodyType<ClaimWalletBody>;
+export type ClaimWalletMutationError = ErrorType<ClaimWallet400>;
+
+/**
+ * @summary Associate a wallet address with an accountId (self-declaration)
+ */
+export const useClaimWallet = <
+  TError = ErrorType<ClaimWallet400>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof claimWallet>>,
+    TError,
+    { data: BodyType<ClaimWalletBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof claimWallet>>,
+  TError,
+  { data: BodyType<ClaimWalletBody> },
+  TContext
+> => {
+  return useMutation(getClaimWalletMutationOptions(options));
+};
 
 /**
  * @summary Hourly aggregated open-interest history (last 24h)

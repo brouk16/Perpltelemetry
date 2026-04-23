@@ -7,6 +7,7 @@ import {
   marketBucketsTable,
   accountBucketsTable,
   oiSnapshotsTable,
+  accountWalletsTable,
 } from "@workspace/db";
 import {
   GetStatsResponse,
@@ -14,6 +15,8 @@ import {
   GetVolumeTimeseriesResponse,
   GetLeaderboardResponse,
   GetOiHistoryResponse,
+  GetWalletsResponse,
+  ClaimWalletResponse,
 } from "@workspace/api-zod";
 import {
   getChainHeadCached,
@@ -283,16 +286,93 @@ router.get("/stats/leaderboard", async (req, res) => {
         )
       : await baseQuery;
 
-  const entries = rows.map((r, i) => ({
-    rank: i + 1,
-    accountId: String(r.accountId),
-    volumeUsd: Number(r.v),
-    feesUsd: Number(r.f),
-    pnlUsd: Number(r.p),
-    tradeCount: Number(r.c),
-  }));
+  // Load all wallet mappings and build a lookup map
+  const walletRows = await db.select().from(accountWalletsTable);
+  const walletMap = new Map(walletRows.map((w) => [w.accountId, w]));
+
+  const entries = rows.map((r, i) => {
+    const wallet = walletMap.get(Number(r.accountId));
+    return {
+      rank: i + 1,
+      accountId: String(r.accountId),
+      walletAddress: wallet?.walletAddress ?? null,
+      label: wallet?.label ?? null,
+      volumeUsd: Number(r.v),
+      feesUsd: Number(r.f),
+      pnlUsd: Number(r.p),
+      tradeCount: Number(r.c),
+    };
+  });
 
   const data = GetLeaderboardResponse.parse({ period, entries });
+  res.json(data);
+});
+
+router.get("/stats/wallets", async (_req, res) => {
+  const rows = await db.select().from(accountWalletsTable);
+  const wallets = rows.map((r) => ({
+    accountId: String(r.accountId),
+    walletAddress: r.walletAddress,
+    label: r.label ?? null,
+    claimedAtMs: r.claimedAtMs,
+  }));
+  const data = GetWalletsResponse.parse({ wallets });
+  res.json(data);
+});
+
+router.post("/stats/wallets", async (req, res) => {
+  const body = req.body as { accountId?: unknown; walletAddress?: unknown; label?: unknown };
+  const accountIdRaw = String(body.accountId ?? "").trim();
+  const walletAddress = String(body.walletAddress ?? "").trim().toLowerCase();
+  const label = body.label ? String(body.label).slice(0, 64).trim() : null;
+
+  const accountIdNum = Number(accountIdRaw);
+  if (!Number.isFinite(accountIdNum) || accountIdNum <= 0) {
+    res.status(400).json({ error: "Invalid accountId" });
+    return;
+  }
+  if (!/^0x[0-9a-f]{40}$/.test(walletAddress)) {
+    res.status(400).json({ error: "Invalid walletAddress — must be 0x-prefixed 20-byte hex" });
+    return;
+  }
+  // Verify accountId exists in our data
+  const exists = await db
+    .select({ accountId: accountBucketsTable.accountId })
+    .from(accountBucketsTable)
+    .where(eq(accountBucketsTable.accountId, accountIdNum))
+    .limit(1);
+  if (exists.length === 0) {
+    res.status(400).json({ error: "accountId not found in indexed data" });
+    return;
+  }
+
+  await db
+    .insert(accountWalletsTable)
+    .values({
+      accountId: accountIdNum,
+      walletAddress,
+      label: label ?? undefined,
+      claimedAtMs: Date.now(),
+    })
+    .onConflictDoUpdate({
+      target: accountWalletsTable.accountId,
+      set: { walletAddress, label: label ?? undefined, claimedAtMs: Date.now() },
+    });
+
+  const row = (
+    await db
+      .select()
+      .from(accountWalletsTable)
+      .where(eq(accountWalletsTable.accountId, accountIdNum))
+      .limit(1)
+  )[0]!;
+
+  const data = ClaimWalletResponse.parse({
+    accountId: String(row.accountId),
+    walletAddress: row.walletAddress,
+    label: row.label ?? null,
+    claimedAtMs: row.claimedAtMs,
+  });
   res.json(data);
 });
 

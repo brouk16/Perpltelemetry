@@ -101,6 +101,59 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/LeaderboardEntry"
+  /stats/wallets:
+    get:
+      operationId: getWallets
+      tags: [stats]
+      summary: Get all claimed wallet → accountId mappings
+      responses:
+        "200":
+          description: Wallet mappings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [wallets]
+                properties:
+                  wallets:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccountWallet"
+    post:
+      operationId: claimWallet
+      tags: [stats]
+      summary: Associate a wallet address with an accountId (self-declaration)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountId, walletAddress]
+              properties:
+                accountId:
+                  type: string
+                walletAddress:
+                  type: string
+                label:
+                  type: string
+      responses:
+        "200":
+          description: Claimed wallet mapping
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountWallet"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error]
+                properties:
+                  error:
+                    type: string
   /stats/oi-history:
     get:
       operationId: getOiHistory
@@ -249,6 +302,20 @@ components:
           type: number
         dailyTradeCount:
           type: integer
+    AccountWallet:
+      type: object
+      required: [accountId, walletAddress, claimedAtMs]
+      properties:
+        accountId:
+          type: string
+        walletAddress:
+          type: string
+        label:
+          type: string
+          nullable: true
+        claimedAtMs:
+          type: integer
+          format: int64
     LeaderboardEntry:
       type: object
       required: [rank, accountId, volumeUsd, feesUsd, pnlUsd, tradeCount]
@@ -258,6 +325,14 @@ components:
         accountId:
           type: string
           description: Perpl internal account ID (uint256 as decimal string)
+        walletAddress:
+          type: string
+          nullable: true
+          description: User-claimed wallet address (self-declared)
+        label:
+          type: string
+          nullable: true
+          description: Optional display label set by user
         volumeUsd:
           type: number
         feesUsd:

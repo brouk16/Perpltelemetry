@@ -102,6 +102,14 @@ export const GetLeaderboardResponse = zod.object({
       accountId: zod
         .string()
         .describe("Perpl internal account ID (uint256 as decimal string)"),
+      walletAddress: zod
+        .string()
+        .nullish()
+        .describe("User-claimed wallet address (self-declared)"),
+      label: zod
+        .string()
+        .nullish()
+        .describe("Optional display label set by user"),
       volumeUsd: zod.number(),
       feesUsd: zod.number(),
       pnlUsd: zod
@@ -112,6 +120,36 @@ export const GetLeaderboardResponse = zod.object({
       tradeCount: zod.number(),
     }),
   ),
+});
+
+/**
+ * @summary Get all claimed wallet → accountId mappings
+ */
+export const GetWalletsResponse = zod.object({
+  wallets: zod.array(
+    zod.object({
+      accountId: zod.string(),
+      walletAddress: zod.string(),
+      label: zod.string().nullish(),
+      claimedAtMs: zod.number(),
+    }),
+  ),
+});
+
+/**
+ * @summary Associate a wallet address with an accountId (self-declaration)
+ */
+export const ClaimWalletBody = zod.object({
+  accountId: zod.string(),
+  walletAddress: zod.string(),
+  label: zod.string().optional(),
+});
+
+export const ClaimWalletResponse = zod.object({
+  accountId: zod.string(),
+  walletAddress: zod.string(),
+  label: zod.string().nullish(),
+  claimedAtMs: zod.number(),
 });
 
 /**

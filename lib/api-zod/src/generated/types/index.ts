@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./accountWallet";
+export * from "./claimWallet400";
+export * from "./claimWalletBody";
 export * from "./getLeaderboard200";
 export * from "./getLeaderboard200Period";
 export * from "./getLeaderboardMetric";
@@ -14,6 +17,7 @@ export * from "./getLeaderboardPeriod";
 export * from "./getMarketStats200";
 export * from "./getOiHistory200";
 export * from "./getVolumeTimeseries200";
+export * from "./getWallets200";
 export * from "./healthStatus";
 export * from "./leaderboardEntry";
 export * from "./marketOi";

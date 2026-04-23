@@ -6,6 +6,7 @@ import {
   text,
   primaryKey,
   index,
+  varchar,
 } from "drizzle-orm/pg-core";
 
 export const indexerStateTable = pgTable("indexer_state", {
@@ -67,6 +68,13 @@ export const oiSnapshotsTable = pgTable(
     tsIdx: index("oi_snapshots_ts_idx").on(t.timestampMs),
   }),
 );
+
+export const accountWalletsTable = pgTable("account_wallets", {
+  accountId: bigint("account_id", { mode: "number" }).primaryKey(),
+  walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+  label: varchar("label", { length: 64 }),
+  claimedAtMs: bigint("claimed_at_ms", { mode: "number" }).notNull(),
+});
 
 export const marketBucketsTable = pgTable(
   "market_buckets",
