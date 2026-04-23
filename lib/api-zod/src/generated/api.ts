@@ -187,6 +187,34 @@ export const GetOiHistoryResponse = zod.object({
 });
 
 /**
+ * @summary Per-market volume breakdown with 24h timeseries
+ */
+export const GetVolumeBreakdownResponse = zod.object({
+  perMarket: zod.array(
+    zod.object({
+      perpId: zod.number(),
+      symbol: zod.string(),
+      volumeUsd24h: zod.number(),
+      tradeCount24h: zod.number(),
+    }),
+  ),
+  perMarketHistory: zod
+    .array(
+      zod.object({
+        perpId: zod.number(),
+        symbol: zod.string(),
+        points: zod.array(
+          zod.object({
+            timestampMs: zod.number(),
+            volumeUsd: zod.number(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+});
+
+/**
  * @summary Hourly volume buckets for the last 24 hours
  */
 export const GetVolumeTimeseriesResponse = zod.object({
