@@ -51,7 +51,11 @@ export const GetStatsResponse = zod.object({
   totalUsers: zod
     .number()
     .optional()
-    .describe("Distinct on-chain accounts seen since the contract deploy"),
+    .describe("Total on-chain accounts created (max accountId)"),
+  tvlUsd: zod
+    .number()
+    .optional()
+    .describe("Total value locked in USD (AUSD balance of exchange contract)"),
   openInterestUsd: zod
     .number()
     .optional()
