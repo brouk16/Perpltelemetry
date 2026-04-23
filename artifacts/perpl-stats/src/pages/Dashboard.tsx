@@ -298,14 +298,43 @@ export default function Dashboard() {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent className="font-mono bg-card border-primary/50 text-foreground">
-                  {(stats.totalUsers ?? 0).toLocaleString()} distinct on-chain accounts
+                  {(stats.totalUsers ?? 0).toLocaleString()} accounts created on-chain
                 </TooltipContent>
               </Tooltip>
               <div className="mt-2 text-[9px] tracking-widest uppercase text-muted-foreground">
-                Distinct accountIds since contract genesis
+                Total accounts created on-chain
               </div>
               <div className="mt-4 text-xs text-muted-foreground uppercase">
                 Avg vol/user: <span className="text-foreground">{formatUsdCompact((stats.totalUsers ?? 0) > 0 ? stats.totalVolumeUsd / (stats.totalUsers ?? 1) : 0)}</span>
+              </div>
+            </motion.div>
+
+            {/* TVL */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-card border border-primary/20 p-6 corner-brackets relative group"
+            >
+              <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <p className="text-xs text-muted-foreground tracking-widest uppercase mb-2 flex items-center">
+                <Database className="w-3.5 h-3.5 mr-2 text-primary" /> TVL
+              </p>
+              <Tooltip>
+                <TooltipTrigger className="text-left">
+                  <div className="text-4xl md:text-5xl font-bold text-primary">
+                    <AnimatedNumber value={stats.tvlUsd ?? 0} formatFn={formatUsdCompact} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="font-mono bg-card border-primary/50 text-foreground">
+                  {formatUsdFull(stats.tvlUsd ?? 0)} total value locked
+                </TooltipContent>
+              </Tooltip>
+              <div className="mt-2 text-[9px] tracking-widest uppercase text-muted-foreground">
+                AUSD deposited in exchange contract
+              </div>
+              <div className="mt-4 text-xs text-muted-foreground uppercase">
+                Collateral: <span className="text-foreground">AUSD</span>
               </div>
             </motion.div>
 
@@ -313,7 +342,7 @@ export default function Dashboard() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.25 }}
               className="bg-card border border-primary/20 p-6 corner-brackets relative group"
             >
               <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
