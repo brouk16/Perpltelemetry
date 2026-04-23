@@ -18,4 +18,5 @@ export const KNOWN_MARKETS: Record<number, Market> = {
   1: { perpId: 1, symbol: "BTC", priceDecimals: 1, lotDecimals: 5 },
   10: { perpId: 10, symbol: "MON", priceDecimals: 6, lotDecimals: 0 },
   20: { perpId: 20, symbol: "ETH", priceDecimals: 2, lotDecimals: 3 },
+  30: { perpId: 30, symbol: "SOL", priceDecimals: 2, lotDecimals: 2 },
 };
