@@ -1,3 +1,5 @@
+import "./env-setup";
+
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startIndexer } from "./perpl/indexer";
