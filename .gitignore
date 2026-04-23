@@ -3,6 +3,7 @@
 # compiled output
 dist
 vercel-out
+artifacts/perpl-stats/dist
 tmp
 out-tsc
 *.tsbuildinfo
