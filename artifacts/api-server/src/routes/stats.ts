@@ -107,14 +107,27 @@ router.get("/stats", async (_req, res) => {
     Math.min(1, indexedRange / totalRange),
   );
 
-  const usersAgg = (
+  // Prefer count of unique wallets from auto-indexed deposit events;
+  // fall back to MAX(accountId) from trading data while the wallet scan runs.
+  const walletsAgg = (
     await db
       .select({
-        n: sql<number>`MAX(${accountBucketsTable.accountId})`,
+        n: sql<number>`COUNT(DISTINCT ${accountWalletsTable.walletAddress})`,
       })
-      .from(accountBucketsTable)
+      .from(accountWalletsTable)
   )[0];
-  const totalUsers = Number(usersAgg?.n ?? 0);
+  const walletCount = Number(walletsAgg?.n ?? 0);
+
+  const usersAgg = walletCount > 0
+    ? null
+    : (
+        await db
+          .select({
+            n: sql<number>`MAX(${accountBucketsTable.accountId})`,
+          })
+          .from(accountBucketsTable)
+      )[0];
+  const totalUsers = walletCount > 0 ? walletCount : Number(usersAgg?.n ?? 0);
 
   const tvlUsd = await fetchTvlUsd();
 
