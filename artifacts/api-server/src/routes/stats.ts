@@ -29,6 +29,32 @@ import { KNOWN_MARKETS } from "../perpl/markets";
 const router: IRouter = Router();
 const STATE_ID = "perpl";
 
+const AUSD_TOKEN = "0x00000000efe302beaa2b3e6e1b18d08d69a9012a";
+const PERPL_EXCHANGE = "0x34b6552d57a35a1d042ccae1951bd1c370112a6f";
+const MONAD_RPC = "https://monad.drpc.org";
+
+let tvlCache: { usd: number; ts: number } = { usd: 0, ts: 0 };
+const TVL_CACHE_TTL_MS = 60_000;
+
+async function fetchTvlUsd(): Promise<number> {
+  const now = Date.now();
+  if (now - tvlCache.ts < TVL_CACHE_TTL_MS) return tvlCache.usd;
+  try {
+    const data = "0x70a08231" + PERPL_EXCHANGE.slice(2).padStart(64, "0");
+    const res = await fetch(MONAD_RPC, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", params: [{ to: AUSD_TOKEN, data }, "latest"], id: 1 }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const j = await res.json() as { result?: string };
+    if (j.result && j.result !== "0x") {
+      tvlCache = { usd: Number(BigInt(j.result)) / 1e6, ts: now };
+    }
+  } catch { /* keep cached */ }
+  return tvlCache.usd;
+}
+
 // External baseline anchor (DefiLlama publishes cumulative perp volume on
 // https://defillama.com/protocol/perpl but their API requires a paid plan, so we
 // snapshot the figure manually). Captured 2026-04-22 from the DefiLlama UI:
@@ -91,11 +117,13 @@ router.get("/stats", async (_req, res) => {
   const usersAgg = (
     await db
       .select({
-        n: sql<number>`COUNT(DISTINCT ${accountBucketsTable.accountId})`,
+        n: sql<number>`MAX(${accountBucketsTable.accountId})`,
       })
       .from(accountBucketsTable)
   )[0];
   const totalUsers = Number(usersAgg?.n ?? 0);
+
+  const tvlUsd = await fetchTvlUsd();
 
   const latestOiTsRow = (
     await db
@@ -132,6 +160,7 @@ router.get("/stats", async (_req, res) => {
     baselineAtMs: BASELINE_AT_MS,
     indexedDeltaVolumeUsd: localDeltaSinceBaseline,
     totalUsers,
+    tvlUsd,
     openInterestUsd: oi.totalUsd,
     openInterestAtMs: oi.atMs,
   });
