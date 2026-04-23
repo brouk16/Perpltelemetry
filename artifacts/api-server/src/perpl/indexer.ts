@@ -564,7 +564,9 @@ export async function tickBackfillWallets() {
     )[0];
     if (!mainState) return;
 
-    const floor = await getFloor();
+    // Use the main indexer's backward tail as floor — it's guaranteed to exist
+    // and tells us how far back the indexed data goes (e.g. 69225270).
+    const floor = mainState.backwardTail;
     const head = mainState.forwardHead;
 
     // Get or initialise wallet scan cursor
