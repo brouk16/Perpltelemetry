@@ -24,6 +24,7 @@ import type {
   GetLeaderboardParams,
   GetMarketStats200,
   GetOiHistory200,
+  GetVolumeBreakdown200,
   GetVolumeTimeseries200,
   GetWallets200,
   HealthStatus,
@@ -578,6 +579,80 @@ export function useGetOiHistory<
   request?: SecondParameter<typeof customFetch>;
 }): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
   const queryOptions = getGetOiHistoryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Per-market volume breakdown with 24h timeseries
+ */
+export const getGetVolumeBreakdownUrl = () => {
+  return `/api/stats/volume-breakdown`;
+};
+
+export const getVolumeBreakdown = async (
+  options?: RequestInit,
+): Promise<GetVolumeBreakdown200> => {
+  return customFetch<GetVolumeBreakdown200>(getGetVolumeBreakdownUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetVolumeBreakdownQueryKey = () => {
+  return [`/api/stats/volume-breakdown`] as const;
+};
+
+export const getGetVolumeBreakdownQueryOptions = <
+  TData = Awaited<ReturnType<typeof getVolumeBreakdown>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVolumeBreakdown>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetVolumeBreakdownQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolumeBreakdown>>> = ({
+    signal,
+  }) => getVolumeBreakdown({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getVolumeBreakdown>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetVolumeBreakdownQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getVolumeBreakdown>>
+>;
+export type GetVolumeBreakdownQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Per-market volume breakdown with 24h timeseries
+ */
+export function useGetVolumeBreakdown<
+  TData = Awaited<ReturnType<typeof getVolumeBreakdown>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getVolumeBreakdown>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetVolumeBreakdownQueryOptions(options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
