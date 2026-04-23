@@ -20,7 +20,7 @@ import {
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import Leaderboard from "@/components/Leaderboard";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LineChart, Line } from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { Activity, Server, Database, Globe, ChevronRight, LayoutGrid, Trophy, Users, TrendingUp } from "lucide-react";
 
 type Tab = "overview" | "leaderboard";
@@ -62,6 +62,37 @@ export default function Dashboard() {
     }));
   }, [oiData]);
   const oiPerMarket = oiData?.perMarket ?? [];
+
+  const OI_COLORS = [
+    "hsl(var(--primary))",
+    "hsl(var(--secondary))",
+    "hsl(160, 80%, 50%)",
+    "hsl(280, 70%, 60%)",
+    "hsl(40, 90%, 55%)",
+    "hsl(200, 80%, 60%)",
+  ];
+
+  const stackedOiData = useMemo(() => {
+    const history = oiData?.perMarketHistory;
+    if (!history || history.length === 0) return null;
+    const slots = history[0]?.points.map((p) => p.timestampMs) ?? [];
+    return slots.map((ts, i) => {
+      const row: Record<string, number | string> = {
+        time: new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      };
+      for (const m of history) {
+        row[m.symbol] = m.points[i]?.oiUsd ?? 0;
+      }
+      return row;
+    });
+  }, [oiData]);
+
+  const pieData = useMemo(() => {
+    return oiPerMarket.filter((m) => m.oiUsd > 0).map((m) => ({
+      name: m.symbol,
+      value: m.oiUsd,
+    }));
+  }, [oiPerMarket]);
 
   if (statsLoading || (tab === "overview" && (marketsLoading || tsLoading))) {
     return (
@@ -323,57 +354,132 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {/* OI CHART */}
+          {/* OI BREAKDOWN */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25 }}
-            className="bg-card border border-primary/20 p-6 corner-brackets min-h-[260px] flex flex-col"
+            className="bg-card border border-primary/20 p-6 corner-brackets flex flex-col gap-6"
           >
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground tracking-widest uppercase flex items-center">
                 <TrendingUp className="w-4 h-4 mr-2 text-secondary" />
-                Open Interest (24H)
+                Open Interest Breakdown
               </p>
               <span className="text-xs text-secondary font-bold">
-                {formatUsdCompact(stats.openInterestUsd ?? 0)}
+                {formatUsdCompact(stats.openInterestUsd ?? 0)} TOTAL
               </span>
             </div>
-            <div className="flex-1 w-full relative min-h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={oiChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis
-                    stroke="hsl(var(--muted-foreground))"
-                    fontSize={10}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(v) => formatUsdCompact(v)}
-                    domain={["auto", "auto"]}
-                  />
-                  <RechartsTooltip
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--secondary)/0.5)', fontFamily: 'inherit' }}
-                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                    formatter={(value: number) => [formatUsdCompact(value), 'OI']}
-                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <Line type="monotone" dataKey="oi" stroke="hsl(var(--secondary))" strokeWidth={2} dot={false} isAnimationActive={false} />
-                </LineChart>
+
+            {/* PIE + LEGEND row */}
+            {pieData.length > 0 ? (
+              <div className="flex flex-col sm:flex-row items-center gap-6">
+                <div className="w-[160px] h-[160px] flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={48}
+                        outerRadius={72}
+                        paddingAngle={2}
+                        dataKey="value"
+                        isAnimationActive={false}
+                      >
+                        {pieData.map((_, idx) => (
+                          <Cell key={idx} fill={OI_COLORS[idx % OI_COLORS.length]} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.3)', fontFamily: 'inherit', fontSize: 11 }}
+                        formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-col gap-2 flex-1 min-w-0">
+                  {oiPerMarket.filter((m) => m.oiUsd > 0).map((m, idx) => {
+                    const pct = (stats.openInterestUsd ?? 0) > 0
+                      ? ((m.oiUsd / (stats.openInterestUsd ?? 1)) * 100).toFixed(1)
+                      : "0.0";
+                    return (
+                      <div key={m.perpId} className="flex items-center gap-2 text-xs uppercase tracking-widest">
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: OI_COLORS[idx % OI_COLORS.length] }}
+                        />
+                        <span className="text-muted-foreground flex-1">{m.symbol}</span>
+                        <span className="text-foreground font-bold">{formatUsdCompact(m.oiUsd)}</span>
+                        <span className="text-muted-foreground/60 w-10 text-right">{pct}%</span>
+                        {m.markPrice > 0 && (
+                          <span className="text-muted-foreground/40 hidden sm:inline">@{formatUsdCompact(m.markPrice)}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground tracking-widest uppercase opacity-50">
+                Awaiting first OI snapshot...
+              </p>
+            )}
+
+            {/* STACKED AREA or FALLBACK LINE */}
+            <div className="w-full relative min-h-[180px]">
+              <p className="text-[10px] text-muted-foreground tracking-widest uppercase mb-3 opacity-60">24H History</p>
+              <ResponsiveContainer width="100%" height={180}>
+                {stackedOiData && (oiData?.perMarketHistory?.length ?? 0) > 0 ? (
+                  <AreaChart data={stackedOiData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <defs>
+                      {(oiData?.perMarketHistory ?? []).map((m, idx) => (
+                        <linearGradient key={m.perpId} id={`oiGrad${idx}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.4} />
+                          <stop offset="95%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.05} />
+                        </linearGradient>
+                      ))}
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatUsdCompact(v)} domain={["auto", "auto"]} />
+                    <RechartsTooltip
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--secondary)/0.5)', fontFamily: 'inherit', fontSize: 11 }}
+                      formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                    />
+                    {(oiData?.perMarketHistory ?? []).map((m, idx) => (
+                      <Area
+                        key={m.perpId}
+                        type="monotone"
+                        dataKey={m.symbol}
+                        stackId="oi"
+                        stroke={OI_COLORS[idx % OI_COLORS.length]}
+                        fill={`url(#oiGrad${idx})`}
+                        strokeWidth={1.5}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  </AreaChart>
+                ) : (
+                  <LineChart data={oiChart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatUsdCompact(v)} domain={["auto", "auto"]} />
+                    <RechartsTooltip
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--secondary)/0.5)', fontFamily: 'inherit' }}
+                      formatter={(value: number) => [formatUsdCompact(value), 'OI']}
+                      itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                    />
+                    <Line type="monotone" dataKey="oi" stroke="hsl(var(--secondary))" strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </LineChart>
+                )}
               </ResponsiveContainer>
             </div>
-            {oiPerMarket.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-primary/10 flex flex-wrap gap-x-4 gap-y-1 text-[10px] uppercase tracking-widest">
-                {oiPerMarket.map((m) => (
-                  <span key={m.perpId} className="text-muted-foreground">
-                    {m.symbol}: <span className="text-foreground">{formatUsdCompact(m.oiUsd)}</span>
-                    {m.markPrice > 0 && (
-                      <span className="text-muted-foreground/60 ml-1">@{formatUsdCompact(m.markPrice)}</span>
-                    )}
-                  </span>
-                ))}
-              </div>
-            )}
           </motion.div>
         </div>
 

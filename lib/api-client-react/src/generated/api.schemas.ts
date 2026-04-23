@@ -141,9 +141,16 @@ export type ClaimWallet400 = {
   error: string;
 };
 
+export interface MarketOiHistory {
+  perpId: number;
+  symbol: string;
+  points: OiPoint[];
+}
+
 export type GetOiHistory200 = {
   points: OiPoint[];
   perMarket: MarketOi[];
+  perMarketHistory?: MarketOiHistory[];
 };
 
 export type GetVolumeTimeseries200 = {

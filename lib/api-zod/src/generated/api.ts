@@ -170,6 +170,20 @@ export const GetOiHistoryResponse = zod.object({
       markPrice: zod.number(),
     }),
   ),
+  perMarketHistory: zod
+    .array(
+      zod.object({
+        perpId: zod.number(),
+        symbol: zod.string(),
+        points: zod.array(
+          zod.object({
+            timestampMs: zod.number(),
+            oiUsd: zod.number(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
 });
 
 /**

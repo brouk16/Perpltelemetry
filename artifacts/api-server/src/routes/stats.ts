@@ -22,6 +22,7 @@ import {
   getChainHeadCached,
   getContractFloorCached,
 } from "../perpl/indexer";
+import { getLatestOiSnapshot } from "../perpl/oi";
 import { KNOWN_MARKETS } from "../perpl/markets";
 
 const router: IRouter = Router();
@@ -139,9 +140,11 @@ router.get("/stats", async (_req, res) => {
 router.get("/stats/oi-history", async (_req, res) => {
   const now = Date.now();
   const sinceMs = now - 24 * 60 * 60 * 1000;
+
   const rows = await db
     .select({
       timestampMs: oiSnapshotsTable.timestampMs,
+      perpId: oiSnapshotsTable.perpId,
       oiUsd: oiSnapshotsTable.oiUsd,
     })
     .from(oiSnapshotsTable)
@@ -153,34 +156,66 @@ router.get("/stats/oi-history", async (_req, res) => {
     const slot = Math.floor((now - i * HOUR) / HOUR) * HOUR;
     buckets.set(slot, 0);
   }
-  // Sum per timestamp first (each ts has one row per market) then take MAX per
-  // hour bucket so the chart shows a representative OI level per hour.
+  const allSlots = Array.from(buckets.keys()).sort((a, b) => a - b);
+
+  // Aggregate rows: sum per timestamp, then MAX per hour bucket (total OI)
   const perTs = new Map<number, number>();
+  // Per-market: perpId -> slot -> maxOiUsd
+  const mktBuckets = new Map<number, Map<number, number>>();
+
   for (const r of rows) {
     const ts = Number(r.timestampMs);
-    perTs.set(ts, (perTs.get(ts) ?? 0) + Number(r.oiUsd));
+    const oiUsd = Number(r.oiUsd);
+    const pid = r.perpId;
+    const slot = Math.floor(ts / HOUR) * HOUR;
+    if (!buckets.has(slot)) continue;
+
+    perTs.set(ts, (perTs.get(ts) ?? 0) + oiUsd);
+
+    if (!mktBuckets.has(pid)) mktBuckets.set(pid, new Map());
+    const mb = mktBuckets.get(pid)!;
+    mb.set(slot, Math.max(mb.get(slot) ?? 0, oiUsd));
   }
+
   for (const [ts, sumUsd] of perTs) {
     const slot = Math.floor(ts / HOUR) * HOUR;
     if (!buckets.has(slot)) continue;
     buckets.set(slot, Math.max(buckets.get(slot)!, sumUsd));
   }
 
-  const points = Array.from(buckets.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([timestampMs, oiUsd]) => ({ timestampMs, oiUsd }));
+  const points = allSlots.map((slot) => ({ timestampMs: slot, oiUsd: buckets.get(slot)! }));
 
-  // If we have no historical snapshots yet (first boot), seed the most recent
-  // bucket with the live in-memory snapshot so the chart isn't empty.
   const live = getLatestOiSnapshot();
-  if (live.totalUsd > 0 && points[points.length - 1]) {
+
+  // Seed the last bucket with live value if no DB data yet
+  if (live.totalUsd > 0 && points.length > 0) {
     const last = points[points.length - 1]!;
     if (last.oiUsd === 0) last.oiUsd = live.totalUsd;
   }
 
+  // Build per-market history — include all markets that have any data
+  const perpIds = new Set<number>([...mktBuckets.keys(), ...live.perMarket.map((m) => m.perpId)]);
+  const perMarketHistory = Array.from(perpIds)
+    .map((perpId) => {
+      const mb = mktBuckets.get(perpId);
+      const symbol = KNOWN_MARKETS[perpId]?.symbol ?? `PERP${perpId}`;
+      const pts = allSlots.map((slot) => ({
+        timestampMs: slot,
+        oiUsd: mb?.get(slot) ?? 0,
+      }));
+      // Seed last bucket from live if zero
+      const liveM = live.perMarket.find((m) => m.perpId === perpId);
+      if (liveM && pts.length > 0 && pts[pts.length - 1]!.oiUsd === 0) {
+        pts[pts.length - 1]!.oiUsd = liveM.oiUsd;
+      }
+      return { perpId, symbol, points: pts };
+    })
+    .filter((m) => m.points.some((p) => p.oiUsd > 0));
+
   const data = GetOiHistoryResponse.parse({
     points,
     perMarket: live.perMarket,
+    perMarketHistory,
   });
   res.json(data);
 });
