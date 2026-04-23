@@ -344,138 +344,45 @@ export default function Dashboard() {
             </motion.div>
           </div>
 
-          {/* CHART */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-card border border-primary/20 p-6 corner-brackets flex-1 min-h-[300px] flex flex-col"
-          >
-            <p className="text-xs text-muted-foreground tracking-widest uppercase mb-6 flex items-center">
-              <Activity className="w-4 h-4 mr-2 text-primary" />
-              Volume Flow (24H)
-            </p>
-            <div className="flex-1 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorVol" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                  <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={10} 
-                    tickLine={false} 
-                    axisLine={false}
-                    tickFormatter={(v) => formatUsdCompact(v)}
-                  />
-                  <RechartsTooltip 
-                    contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.5)', fontFamily: 'inherit' }}
-                    itemStyle={{ color: 'hsl(var(--foreground))' }}
-                    formatter={(value: number) => [formatUsdCompact(value), 'Volume']}
-                    labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
-                  />
-                  <Area type="step" dataKey="volume" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorVol)" isAnimationActive={false} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </motion.div>
-
-          {/* VOLUME BREAKDOWN */}
+          {/* VOLUME FLOW + BREAKDOWN — single unified block */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.22 }}
-            className="bg-card border border-primary/20 p-6 corner-brackets flex flex-col gap-6"
+            transition={{ delay: 0.2 }}
+            className="bg-card border border-primary/20 p-6 corner-brackets flex flex-col gap-5"
           >
+            {/* header */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground tracking-widest uppercase flex items-center">
                 <Activity className="w-4 h-4 mr-2 text-primary" />
-                Volume Breakdown (24H)
+                Volume Flow (24H)
               </p>
               <span className="text-xs text-primary font-bold">
                 {formatUsdCompact(totalVolBreakdown > 0 ? totalVolBreakdown : stats.dailyVolumeUsd)} TOTAL
               </span>
             </div>
 
-            {volPieData.length > 0 ? (
-              <div className="flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-[160px] h-[160px] flex-shrink-0">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={volPieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={48}
-                        outerRadius={72}
-                        paddingAngle={2}
-                        dataKey="value"
-                        isAnimationActive={false}
-                      >
-                        {volPieData.map((_, idx) => (
-                          <Cell key={idx} fill={OI_COLORS[idx % OI_COLORS.length]} stroke="transparent" />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip
-                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.3)', fontFamily: 'inherit', fontSize: 11 }}
-                        formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
-                        itemStyle={{ color: 'hsl(var(--foreground))' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex flex-col gap-2 flex-1 min-w-0">
-                  {volPerMarket.filter((m) => m.volumeUsd24h > 0).map((m, idx) => {
-                    const total = totalVolBreakdown > 0 ? totalVolBreakdown : 1;
-                    const pct = ((m.volumeUsd24h / total) * 100).toFixed(1);
-                    return (
-                      <div key={m.perpId} className="flex items-center gap-2 text-xs uppercase tracking-widest">
-                        <span
-                          className="w-2 h-2 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: OI_COLORS[idx % OI_COLORS.length] }}
-                        />
-                        <span className="text-muted-foreground flex-1">{m.symbol}</span>
-                        <span className="text-foreground font-bold">{formatUsdCompact(m.volumeUsd24h)}</span>
-                        <span className="text-muted-foreground/60 w-10 text-right">{pct}%</span>
-                        <span className="text-muted-foreground/40 hidden sm:inline">{formatNumberCompact(m.tradeCount24h)} txs</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground tracking-widest uppercase opacity-50">
-                Awaiting volume data...
-              </p>
-            )}
-
-            {/* STACKED AREA history */}
-            <div className="w-full relative min-h-[180px]">
-              <p className="text-[10px] text-muted-foreground tracking-widest uppercase mb-3 opacity-60">24H History</p>
-              <ResponsiveContainer width="100%" height={180}>
+            {/* main chart — stacked by market, falls back to simple total */}
+            <div className="w-full">
+              <ResponsiveContainer width="100%" height={240}>
                 {stackedVolData && (volBreakdownData?.perMarketHistory?.length ?? 0) > 0 ? (
                   <AreaChart data={stackedVolData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       {(volBreakdownData?.perMarketHistory ?? []).map((m, idx) => (
                         <linearGradient key={m.perpId} id={`volGrad${idx}`} x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.4} />
-                          <stop offset="95%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.05} />
+                          <stop offset="5%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.45} />
+                          <stop offset="95%" stopColor={OI_COLORS[idx % OI_COLORS.length]} stopOpacity={0.04} />
                         </linearGradient>
                       ))}
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatUsdCompact(v)} domain={["auto", "auto"]} />
+                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatUsdCompact(v)} />
                     <RechartsTooltip
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.5)', fontFamily: 'inherit', fontSize: 11 }}
-                      formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.4)', fontFamily: 'inherit', fontSize: 11 }}
                       itemStyle={{ color: 'hsl(var(--foreground))' }}
-                      labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))', marginBottom: 4 }}
+                      formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
                     />
                     {(volBreakdownData?.perMarketHistory ?? []).map((m, idx) => (
                       <Area
@@ -494,7 +401,7 @@ export default function Dashboard() {
                 ) : (
                   <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <defs>
-                      <linearGradient id="colorVolBd" x1="0" y1="0" x2="0" y2="1">
+                      <linearGradient id="colorVolMain" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
                         <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
                       </linearGradient>
@@ -503,15 +410,62 @@ export default function Dashboard() {
                     <XAxis dataKey="time" stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} />
                     <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => formatUsdCompact(v)} />
                     <RechartsTooltip
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.5)', fontFamily: 'inherit', fontSize: 11 }}
-                      formatter={(value: number) => [formatUsdCompact(value), 'Volume']}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.5)', fontFamily: 'inherit' }}
                       itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      formatter={(value: number) => [formatUsdCompact(value), 'Volume']}
+                      labelStyle={{ color: 'hsl(var(--muted-foreground))' }}
                     />
-                    <Area type="step" dataKey="volume" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorVolBd)" isAnimationActive={false} />
+                    <Area type="step" dataKey="volume" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorVolMain)" isAnimationActive={false} />
                   </AreaChart>
                 )}
               </ResponsiveContainer>
             </div>
+
+            {/* pie + legend */}
+            {volPieData.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-center gap-6 pt-2 border-t border-primary/10">
+                <div className="w-[140px] h-[140px] flex-shrink-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={volPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={42}
+                        outerRadius={64}
+                        paddingAngle={2}
+                        dataKey="value"
+                        isAnimationActive={false}
+                      >
+                        {volPieData.map((_, idx) => (
+                          <Cell key={idx} fill={OI_COLORS[idx % OI_COLORS.length]} stroke="transparent" />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip
+                        contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--primary)/0.3)', fontFamily: 'inherit', fontSize: 11 }}
+                        formatter={(value: number, name: string) => [formatUsdCompact(value), name]}
+                        itemStyle={{ color: 'hsl(var(--foreground))' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                  {volPerMarket.filter((m) => m.volumeUsd24h > 0).map((m, idx) => {
+                    const total = totalVolBreakdown > 0 ? totalVolBreakdown : 1;
+                    const pct = ((m.volumeUsd24h / total) * 100).toFixed(1);
+                    return (
+                      <div key={m.perpId} className="flex items-center gap-2 text-xs uppercase tracking-widest">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: OI_COLORS[idx % OI_COLORS.length] }} />
+                        <span className="text-muted-foreground flex-1">{m.symbol}</span>
+                        <span className="text-foreground font-bold">{formatUsdCompact(m.volumeUsd24h)}</span>
+                        <span className="text-muted-foreground/60 w-10 text-right">{pct}%</span>
+                        <span className="text-muted-foreground/40 hidden sm:inline">{formatNumberCompact(m.tradeCount24h)} txs</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* OI BREAKDOWN */}
